@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: short_links_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: short_links
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: short_links_app
+    ports:
+      - "80:80"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/short_links
+      SHORT_URL_BASE: https://short.io/r
+      ENVIRONMENT: production
+      CORS_ORIGINS: '["http://localhost", "http://127.0.0.1"]'
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: short_links_app_dev
+    ports:
+      - "8080:8080"
+      - "5173:5173"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/short_links
+      SHORT_URL_BASE: http://localhost:8080
+      ENVIRONMENT: development
+      CORS_ORIGINS: '["http://localhost:5173", "http://localhost:8080"]'
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    networks:
+      - app-network
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
