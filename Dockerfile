@@ -10,8 +10,8 @@ WORKDIR /tmp
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv venv /opt/venv && \
-    /opt/venv/bin/uv pip install -r <(uv pip compile pyproject.toml)
+RUN /bin/bash -c 'uv venv /opt/venv && \
+    /opt/venv/bin/uv pip install -r <(uv pip compile pyproject.toml)'
 
 FROM node:20-alpine as frontend-builder
 
