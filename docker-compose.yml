@@ -17,6 +17,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
 
   app:
     build: .
@@ -34,6 +37,8 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+    profiles:
+      - prod
 
   app-dev:
     build:
@@ -44,15 +49,13 @@ services:
       - "8080:8080"
       - "5173:5173"
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/short_links
+      DATABASE_URL: sqlite:///./database.db
       SHORT_URL_BASE: http://localhost:8080
       ENVIRONMENT: development
-      CORS_ORIGINS: '["http://localhost:5173", "http://localhost:8080"]'
-    depends_on:
-      db:
-        condition: service_healthy
+      CORS_ORIGINS: '["http://localhost:5173", "http://localhost:8080", "http://10.0.2.15:5173"]'
     volumes:
       - .:/app
+      - /app/node_modules
     restart: unless-stopped
     networks:
       - app-network
@@ -61,6 +64,7 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
 
 networks:
   app-network:

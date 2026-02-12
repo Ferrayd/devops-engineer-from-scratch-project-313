@@ -33,9 +33,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Short Links API",
-    description="API для создания и управления короткими ссылками",
+    description="REST API для создания и управления короткими ссылками",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 
@@ -87,10 +90,12 @@ async def ping():
 
 @app.get("/api/links")
 async def list_links(
-    range: Optional[str] = Query(None, description="Диапазон в формате [start,end]"),
+    range: Optional[str] = Query(
+        None, 
+        description="Диапазон в формате [start,end], например [0,10]"
+    ),
     session: AsyncSession = Depends(get_session),
 ):
-
     start, end = parse_range_header(range)
     
     links, total = await get_paginated_links(session, start, end)
@@ -115,7 +120,8 @@ async def list_links(
 
 @app.post("/api/links", response_model=LinkResponse, status_code=status.HTTP_201_CREATED)
 async def create_short_link(
-    link_data: LinkCreate, session: AsyncSession = Depends(get_session)
+    link_data: LinkCreate, 
+    session: AsyncSession = Depends(get_session)
 ):
     existing = await get_link_by_short_name(session, link_data.short_name)
     if existing:
@@ -147,7 +153,10 @@ async def create_short_link(
 
 
 @app.get("/api/links/{link_id}", response_model=LinkResponse)
-async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
+async def get_link(
+    link_id: int, 
+    session: AsyncSession = Depends(get_session)
+):
     link = await get_link_by_id(session, link_id)
     if not link:
         raise HTTPException(
@@ -208,7 +217,11 @@ async def update_short_link(
 
 
 @app.delete("/api/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_short_link(link_id: int, session: AsyncSession = Depends(get_session)):
+async def delete_short_link(
+    link_id: int, 
+    session: AsyncSession = Depends(get_session)
+):
+
     success = await delete_link(session, link_id)
     if not success:
         raise HTTPException(

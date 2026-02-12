@@ -21,7 +21,9 @@ COPY package.json package-lock.json ./
 
 RUN npm ci
 
-RUN npx start-hexlet-devops-deploy-crud-frontend --output dist
+COPY build-frontend.sh ./
+
+RUN chmod +x build-frontend.sh && ./build-frontend.sh
 
 FROM python:3.11-slim
 
@@ -30,8 +32,12 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends nginx supervisor && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+        nginx \
+        supervisor \
+        curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/apt/*
 
 WORKDIR /app
 
@@ -47,11 +53,11 @@ COPY nginx/nginx.conf /etc/nginx/nginx.conf
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-RUN mkdir -p /var/log/supervisor
+RUN mkdir -p /var/log/supervisor /var/run/supervisor
 
 EXPOSE 80
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost/ping || exit 1
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

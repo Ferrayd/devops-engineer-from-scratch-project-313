@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Setup Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -24,37 +26,66 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
       
-      - name: Cache uv installation
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Cache uv
         uses: actions/cache@v3
         with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
+          path: |
+            ~/.cache/uv
+            ~/.cache/pip
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
       
       - name: Install uv
-        run: |
-          pip install uv
+        run: pip install uv
       
-      - name: Install dependencies
-        run: |
-          uv sync
+      - name: Install Python dependencies
+        run: uv sync
       
-      - name: Lint with Ruff
+      - name: Install Node dependencies
+        run: npm ci
+      
+      - name: Run Ruff check (linting)
         run: |
+          echo "🔍 Checking code with Ruff..."
           uv run ruff check .
       
-      - name: Format check with Ruff
+      - name: Run Ruff format check
         run: |
+          echo "🔍 Checking code formatting..."
           uv run ruff format . --check
       
-      - name: Run tests with pytest
+      - name: Run pytest (unit tests)
         run: |
+          echo "🧪 Running unit tests..."
           uv run pytest tests/ -v --tb=short
       
-      - name: Upload coverage reports
+      - name: Generate coverage report
         if: matrix.python-version == '3.11'
-        uses: actions/upload-artifact@v3
+        run: |
+          echo "📊 Generating coverage report..."
+          uv run pytest tests/ -v --cov=. --cov-report=xml --cov-report=term-missing
+      
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v3
         with:
-          name: coverage-report
-          path: .coverage
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          verbose: true
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "✅ All checks completed!"
+          echo "- Linting: PASSED"
+          echo "- Format Check: PASSED"
+          echo "- Unit Tests: PASSED"

@@ -1,4 +1,7 @@
+# ============================================================================
 # Python
+# ============================================================================
+
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,7 +9,7 @@ __pycache__/
 .Python
 env/
 venv/
-.venv
+ENV/
 build/
 develop-eggs/
 dist/
@@ -19,37 +22,157 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env.local
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
+.hypothesis/
+*.cover
+coverage.xml
+*.py,cover
 
-# IDE
+# ============================================================================
+# IDE and Editor
+# ============================================================================
+
 .vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# ============================================================================
+# OS
+# ============================================================================
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+*.log
+logs/
 
-# Project specific
-.env
-.env.local
-
+# ============================================================================
 # Node.js
+# ============================================================================
+
 node_modules/
 npm-debug.log
+npm-debug.log*
 yarn-error.log
+yarn-debug.log*
+yarn.lock
+package-lock.json
+pnpm-debug.log*
+lerna-debug.log*
+dist/
+*.tsbuildinfo
+
+# ============================================================================
+# Database
+# ============================================================================
+
+*.db
+*.sqlite
+*.sqlite3
+database.db
+*.rdb
+
+# ============================================================================
+# Docker
+# ============================================================================
+
+.dockerignore
+.docker
+
+# ============================================================================
+# Environment
+# ============================================================================
+
+.env
+.env.local
+.env.*.local
+
+# ============================================================================
+# Temporary and Build Files
+# ============================================================================
+
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.#*
+.cache/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.so
+.eggs/
+*.egg-info/
 dist/
 build/
+*.egg
 
-# Logs
-logs/
-*.log
+# ============================================================================
+# Project Specific
+# ============================================================================
+
+/public/*
+!/public/.gitkeep
+supervisor_*.sock
+*.pid
+.supervisor/
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+
+.github/workflows/*/logs/
+.github/workflows/*/.cache/
+
+# ============================================================================
+# Misc
+# ============================================================================
+
+*.orig
+.venv.bak
+.env.bak
+.idea.bak
+*.backup
+.backup/
+old_*.py
+temp_*.py
+test_*.db
