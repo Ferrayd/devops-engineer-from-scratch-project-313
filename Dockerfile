@@ -13,8 +13,9 @@ WORKDIR /tmp
 COPY pyproject.toml uv.lock ./
 
 RUN uv pip compile pyproject.toml -o requirements.txt && \
-    uv venv /opt/venv && \
-    /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+    python -m venv /opt/venv && \
+    /opt/venv/bin/python -m pip install --upgrade pip && \
+    /opt/venv/bin/python -m pip install --no-cache-dir -r requirements.txt
 
 FROM node:20-alpine as frontend-builder
 
@@ -33,8 +34,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH"
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         nginx \
         supervisor \
         curl \
