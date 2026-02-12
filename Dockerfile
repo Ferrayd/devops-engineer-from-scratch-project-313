@@ -4,15 +4,17 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
+SHELL ["/bin/bash", "-c"]
+
 RUN pip install --no-cache-dir uv
 
 WORKDIR /tmp
 
 COPY pyproject.toml uv.lock ./
 
-RUN uv venv /opt/venv && \
-    /opt/venv/bin/pip install --no-cache-dir -r <(uv pip compile pyproject.toml) || \
-    uv pip install --python /opt/venv/bin/python -r <(uv pip compile pyproject.toml)
+RUN uv pip compile pyproject.toml -o requirements.txt && \
+    uv venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 FROM node:20-alpine as frontend-builder
 
@@ -23,7 +25,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 RUN mkdir -p /app/public && \
-    cp -r node_modules/@hexlet/project-devops-deploy-crud-frontend/dist/* /app/public/ || true
+    cp -r node_modules/@hexlet/project-devops-deploy-crud-frontend/dist/* /app/public/ 2>/dev/null || true
 
 FROM python:3.11-slim
 
@@ -37,8 +39,7 @@ RUN apt-get update && \
         supervisor \
         curl \
     && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /var/cache/apt/* \
-    && mkdir -p /var/log/supervisor /var/run/supervisor
+    && rm -rf /var/cache/apt/*
 
 WORKDIR /app
 
@@ -53,6 +54,8 @@ COPY --from=frontend-builder /app/public /app/public
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+RUN mkdir -p /var/log/supervisor /var/run/supervisor
 
 EXPOSE 80
 
