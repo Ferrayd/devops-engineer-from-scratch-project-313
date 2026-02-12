@@ -4,14 +4,15 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN pip install uv
+RUN pip install --no-cache-dir uv
 
 WORKDIR /tmp
 
 COPY pyproject.toml uv.lock ./
 
-RUN /bin/bash -c 'uv venv /opt/venv && \
-    /opt/venv/bin/uv pip install -r <(uv pip compile pyproject.toml)'
+RUN uv venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir -r <(uv pip compile pyproject.toml) || \
+    uv pip install --python /opt/venv/bin/python -r <(uv pip compile pyproject.toml)
 
 FROM node:20-alpine as frontend-builder
 
@@ -36,7 +37,8 @@ RUN apt-get update && \
         supervisor \
         curl \
     && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /var/cache/apt/*
+    && rm -rf /var/cache/apt/* \
+    && mkdir -p /var/log/supervisor /var/run/supervisor
 
 WORKDIR /app
 
@@ -51,8 +53,6 @@ COPY --from=frontend-builder /app/public /app/public
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-RUN mkdir -p /var/log/supervisor /var/run/supervisor
 
 EXPOSE 80
 
