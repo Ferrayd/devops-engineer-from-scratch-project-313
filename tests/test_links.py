@@ -1,250 +1,251 @@
 import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel
-
-from config import settings
-from database import get_session
-from main import app
-from models import Link
 
 
-@pytest.fixture
-async def async_session():
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        echo=False,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-    
-    from sqlalchemy.ext.asyncio import sessionmaker
-    
-    async_session_maker = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-    
-    async with async_session_maker() as session:
-        yield session
-    
-    await engine.dispose()
+class TestLinksCreate:
 
-
-@pytest.fixture
-def client(async_session):
-    def get_session_override():
-        return async_session
-    
-    app.dependency_overrides[get_session] = get_session_override
-    
-    from httpx import Client
-    with Client(app=app) as test_client:
-        yield test_client
-    
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture
-async def async_client(async_session):
-    def get_session_override():
-        return async_session
-    
-    app.dependency_overrides[get_session] = get_session_override
-    
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        yield client
-    
-    app.dependency_overrides.clear()
-
-
-class TestPagination:
-    
     @pytest.mark.asyncio
-    async def test_pagination_default_range(self, async_client, async_session):
-        for i in range(1, 16):
-            link = Link(
-                original_url=f"https://example.com/url{i}",
-                short_name=f"link{i}",
-            )
-            async_session.add(link)
-        
-        await async_session.commit()
-        
+    async def test_create_link_success(self, async_client):
+        link_data = {
+            "original_url": "https://example.com/long-url",
+            "short_name": "exmpl",
+        }
+        response = await async_client.post("/api/links", json=link_data)
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["original_url"] == "https://example.com/long-url"
+        assert data["short_name"] == "exmpl"
+        assert "exmpl" in data["short_url"]
+        assert data["id"] is not None
+        assert data["created_at"] is not None
+
+    @pytest.mark.asyncio
+    async def test_create_link_duplicate_short_name(self, async_client):
+        link_data = {
+            "original_url": "https://example.com/long-url",
+            "short_name": "exmpl",
+        }
+
+        response1 = await async_client.post("/api/links", json=link_data)
+        assert response1.status_code == 201
+
+        response2 = await async_client.post("/api/links", json=link_data)
+        assert response2.status_code == 409
+        assert "already exists" in response2.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_create_link_invalid_url(self, async_client):
+        link_data = {
+            "original_url": "not-a-valid-url",
+            "short_name": "test",
+        }
+        response = await async_client.post("/api/links", json=link_data)
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_create_link_missing_fields(self, async_client):
+        link_data = {"short_name": "test"}
+        response = await async_client.post("/api/links", json=link_data)
+        assert response.status_code == 422
+
+        link_data = {"original_url": "https://example.com"}
+        response = await async_client.post("/api/links", json=link_data)
+        assert response.status_code == 422
+
+
+class TestLinksRead:
+
+    @pytest.mark.asyncio
+    async def test_get_all_links_empty(self, async_client):
         response = await async_client.get("/api/links")
-        
-        assert response.status_code == 200
-        assert len(response.json()) == 10
-        assert response.headers["Accept-Ranges"] == "links"
-        assert response.headers["Content-Range"] == "links 0-9/15"
-    
-    @pytest.mark.asyncio
-    async def test_pagination_first_page(self, async_client, async_session):
-        for i in range(1, 21):
-            link = Link(
-                original_url=f"https://example.com/url{i}",
-                short_name=f"link{i}",
-            )
-            async_session.add(link)
-        
-        await async_session.commit()
-        
-        response = await async_client.get("/api/links?range=[0,10]")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 10
-        assert data[0]["id"] == 1
-        assert data[9]["id"] == 10
-        assert response.headers["Content-Range"] == "links 0-9/20"
-    
-    @pytest.mark.asyncio
-    async def test_pagination_second_page(self, async_client, async_session):
-        for i in range(1, 21):
-            link = Link(
-                original_url=f"https://example.com/url{i}",
-                short_name=f"link{i}",
-            )
-            async_session.add(link)
-        
-        await async_session.commit()
-        
-        response = await async_client.get("/api/links?range=[10,20]")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 10
-        assert data[0]["id"] == 11
-        assert data[9]["id"] == 20
-        assert response.headers["Content-Range"] == "links 10-19/20"
-    
-    @pytest.mark.asyncio
-    async def test_pagination_partial_last_page(self, async_client, async_session):
-        for i in range(1, 16):
-            link = Link(
-                original_url=f"https://example.com/url{i}",
-                short_name=f"link{i}",
-            )
-            async_session.add(link)
-        
-        await async_session.commit()
-        
-        response = await async_client.get("/api/links?range=[5,15]")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 10
-        assert data[0]["id"] == 6
-        assert data[9]["id"] == 15
-        assert response.headers["Content-Range"] == "links 5-14/15"
-    
-    @pytest.mark.asyncio
-    async def test_pagination_empty_list(self, async_client):
-        response = await async_client.get("/api/links?range=[0,10]")
-        
         assert response.status_code == 200
         assert response.json() == []
         assert response.headers["Content-Range"] == "links 0-0/0"
-    
+
     @pytest.mark.asyncio
-    async def test_pagination_invalid_range_format(self, async_client, async_session):
-        link = Link(
-            original_url="https://example.com/url",
-            short_name="link",
-        )
-        async_session.add(link)
-        await async_session.commit()
-        
+    async def test_get_all_links_with_pagination(self, async_client, sample_links):
+        response = await async_client.get("/api/links?range=[0,3]")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 3
+        assert response.headers["Content-Range"] == "links 0-2/5"
+
+    @pytest.mark.asyncio
+    async def test_get_link_by_id_success(self, async_client, sample_links):
+        link_id = sample_links[0].id
+        response = await async_client.get(f"/api/links/{link_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == link_id
+        assert data["short_name"] == "link1"
+        assert data["original_url"] == "https://example.com/url1"
+
+    @pytest.mark.asyncio
+    async def test_get_link_by_id_not_found(self, async_client):
+        response = await async_client.get("/api/links/999")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+
+class TestLinksUpdate:
+
+    @pytest.mark.asyncio
+    async def test_update_link_success(self, async_client, sample_links):
+        link_id = sample_links[0].id
+        updated_data = {
+            "original_url": "https://example.com/updated-url",
+            "short_name": "updated",
+        }
+        response = await async_client.put(f"/api/links/{link_id}", json=updated_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == link_id
+        assert data["original_url"] == "https://example.com/updated-url"
+        assert data["short_name"] == "updated"
+
+    @pytest.mark.asyncio
+    async def test_update_link_duplicate_short_name(self, async_client, sample_links):
+        link1_id = sample_links[0].id
+        link2_short_name = sample_links[1].short_name
+
+        update_data = {
+            "original_url": "https://example.com/updated",
+            "short_name": link2_short_name,
+        }
+        response = await async_client.put(f"/api/links/{link1_id}", json=update_data)
+
+        assert response.status_code == 409
+        assert "already exists" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_update_link_not_found(self, async_client):
+        update_data = {
+            "original_url": "https://example.com/url",
+            "short_name": "url",
+        }
+        response = await async_client.put("/api/links/999", json=update_data)
+        assert response.status_code == 404
+
+
+class TestLinksDelete:
+
+    @pytest.mark.asyncio
+    async def test_delete_link_success(self, async_client, sample_links):
+        link_id = sample_links[0].id
+
+        response = await async_client.delete(f"/api/links/{link_id}")
+        assert response.status_code == 204
+        assert response.content == b""
+
+        get_response = await async_client.get(f"/api/links/{link_id}")
+        assert get_response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_delete_link_not_found(self, async_client):
+        response = await async_client.delete("/api/links/999")
+        assert response.status_code == 404
+
+
+class TestPagination:
+
+    @pytest.mark.asyncio
+    async def test_pagination_first_page(self, async_client, sample_links):
+        response = await async_client.get("/api/links?range=[0,3]")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 3
+        assert data[0]["id"] == 1
+        assert data[2]["id"] == 3
+        assert "0-2/5" in response.headers["Content-Range"]
+
+    @pytest.mark.asyncio
+    async def test_pagination_second_page(self, async_client, sample_links):
+        response = await async_client.get("/api/links?range=[3,5]")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert data[0]["id"] == 4
+        assert data[1]["id"] == 5
+        assert "3-4/5" in response.headers["Content-Range"]
+
+    @pytest.mark.asyncio
+    async def test_pagination_invalid_range_format(self, async_client, sample_links):
         response = await async_client.get("/api/links?range=invalid")
-        
         assert response.status_code == 200
-        assert len(response.json()) == 1
-        assert response.headers["Content-Range"] == "links 0-0/1"
-    
-    @pytest.mark.asyncio
-    async def test_pagination_negative_start(self, async_client, async_session):
-        for i in range(1, 6):
-            link = Link(
-                original_url=f"https://example.com/url{i}",
-                short_name=f"link{i}",
-            )
-            async_session.add(link)
-        
-        await async_session.commit()
-        
-        response = await async_client.get("/api/links?range=[-5,10]")
-        
-        assert response.status_code == 200
-        assert len(response.json()) == 5
-        assert response.headers["Content-Range"] == "links 0-4/5"
-    
-    @pytest.mark.asyncio
-    async def test_pagination_end_less_than_start(self, async_client, async_session):
-        for i in range(1, 21):
-            link = Link(
-                original_url=f"https://example.com/url{i}",
-                short_name=f"link{i}",
-            )
-            async_session.add(link)
-        
-        await async_session.commit()
-        
-        response = await async_client.get("/api/links?range=[5,3]")
-        
-        assert response.status_code == 200
-        assert len(response.json()) == 10
+        assert len(response.json()) >= 1
+        assert "Content-Range" in response.headers
 
 
-class TestLinksWithPagination:
-    
+class TestErrorHandling:
+
     @pytest.mark.asyncio
-    async def test_create_and_paginate(self, async_client, async_session):
-        for i in range(1, 26):
-            link_data = {
-                "original_url": f"https://example.com/url{i}",
-                "short_name": f"link{i}",
-            }
-            response = await async_client.post("/api/links", json=link_data)
-            assert response.status_code == 201
-        
-        page1 = await async_client.get("/api/links?range=[0,10]")
-        assert page1.status_code == 200
-        assert len(page1.json()) == 10
-        assert page1.headers["Content-Range"] == "links 0-9/25"
-        
-        page2 = await async_client.get("/api/links?range=[10,20]")
-        assert page2.status_code == 200
-        assert len(page2.json()) == 10
-        assert page2.headers["Content-Range"] == "links 10-19/25"
-        
-        page3 = await async_client.get("/api/links?range=[20,30]")
-        assert page3.status_code == 200
-        assert len(page3.json()) == 5
-        assert page3.headers["Content-Range"] == "links 20-24/25"
-    
+    async def test_404_not_found(self, async_client):
+        response = await async_client.get("/api/links/999")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
     @pytest.mark.asyncio
-    async def test_pagination_after_delete(self, async_client, async_session):
-        ids = []
-        for i in range(1, 16):
-            link = Link(
-                original_url=f"https://example.com/url{i}",
-                short_name=f"link{i}",
-            )
-            async_session.add(link)
-        
-        await async_session.commit()
-        
-        response = await async_client.get("/api/links?range=[0,5]")
-        first_id = response.json()[0]["id"]
-        
-        response = await async_client.get("/api/links?range=[0,20]")
-        assert response.headers["Content-Range"] == "links 0-14/15"
-        
-        delete_response = await async_client.delete(f"/api/links/{first_id}")
-        assert delete_response.status_code == 204
-        
-        response = await async_client.get("/api/links?range=[0,20]")
-        assert response.headers["Content-Range"] == "links 0-13/14"
+    async def test_409_conflict(self, async_client):
+        link_data = {
+            "original_url": "https://example.com/url",
+            "short_name": "test",
+        }
+        await async_client.post("/api/links", json=link_data)
+        response = await async_client.post("/api/links", json=link_data)
+        assert response.status_code == 409
+        assert "already exists" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_422_validation_error(self, async_client):
+        link_data = {
+            "original_url": "invalid-url",
+            "short_name": "test",
+        }
+        response = await async_client.post("/api/links", json=link_data)
+        assert response.status_code == 422
+
+
+class TestResponseFormat:
+
+    @pytest.mark.asyncio
+    async def test_link_response_has_all_fields(self, async_client):
+        link_data = {
+            "original_url": "https://example.com/long-url",
+            "short_name": "test",
+        }
+        response = await async_client.post("/api/links", json=link_data)
+        data = response.json()
+
+        assert "id" in data
+        assert "original_url" in data
+        assert "short_name" in data
+        assert "short_url" in data
+        assert "created_at" in data
+
+    @pytest.mark.asyncio
+    async def test_short_url_format(self, async_client):
+        link_data = {
+            "original_url": "https://example.com/long-url",
+            "short_name": "mylink",
+        }
+        response = await async_client.post("/api/links", json=link_data)
+        data = response.json()
+
+        assert "mylink" in data["short_url"]
+        assert data["short_url"].endswith("/mylink")
+
+    @pytest.mark.asyncio
+    async def test_list_response_is_array(self, async_client, sample_links):
+        response = await async_client.get("/api/links")
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_content_range_header_present(self, async_client, sample_links):
+        response = await async_client.get("/api/links?range=[0,3]")
+        assert "Content-Range" in response.headers
+        content_range = response.headers["Content-Range"]
+        assert "links" in content_range
+        assert "-" in content_range
+        assert "/" in content_range

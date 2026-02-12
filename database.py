@@ -1,7 +1,6 @@
-import os
-from typing import AsyncGenerator, Tuple
+from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool, StaticPool
 from sqlmodel import SQLModel, func, select
 
@@ -12,12 +11,12 @@ from models import Link
 def get_async_database_url(database_url: str) -> str:
     if database_url.startswith("sqlite"):
         return database_url.replace("sqlite:///", "sqlite+aiosqlite:///")
-    
+
     if database_url.startswith("postgresql://"):
         return database_url.replace("postgresql://", "postgresql+asyncpg://")
     elif database_url.startswith("postgres://"):
         return database_url.replace("postgres://", "postgresql+asyncpg://")
-    
+
     return database_url
 
 
@@ -40,18 +39,16 @@ else:
         poolclass=NullPool,
     )
 
-async_session_maker = async_sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
-
 
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
-    print("✓ Database tables created/verified")
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async_session_maker = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
     async with async_session_maker() as session:
         yield session
 
@@ -76,11 +73,11 @@ async def get_all_links(session: AsyncSession) -> list[Link]:
 
 async def get_paginated_links(
     session: AsyncSession, start: int = 0, end: int = 10
-) -> Tuple[list[Link], int]:
+) -> tuple[list[Link], int]:
     count_statement = select(func.count(Link.id))
     count_result = await session.execute(count_statement)
     total = count_result.scalar() or 0
-    
+
     statement = (
         select(Link)
         .order_by(Link.id)
@@ -89,7 +86,7 @@ async def get_paginated_links(
     )
     result = await session.execute(statement)
     links = result.scalars().all()
-    
+
     return links, total
 
 
@@ -106,7 +103,7 @@ async def update_link(
     link = await get_link_by_id(session, link_id)
     if not link:
         return None
-    
+
     link.original_url = original_url
     link.short_name = short_name
     await session.commit()
@@ -118,7 +115,7 @@ async def delete_link(session: AsyncSession, link_id: int) -> bool:
     link = await get_link_by_id(session, link_id)
     if not link:
         return False
-    
+
     await session.delete(link)
     await session.commit()
     return True
