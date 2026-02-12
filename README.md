@@ -1,6 +1,7 @@
 ### Hexlet tests and linter status:
 [![Actions Status](https://github.com/Ferrayd/devops-engineer-from-scratch-project-313/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/Ferrayd/devops-engineer-from-scratch-project-313/actions)
 [![CI](https://github.com/Ferrayd/devops-engineer-from-scratch-project-313/actions/workflows/ci.yml/badge.svg)](https://github.com/Ferrayd/devops-engineer-from-scratch-project-313/actions/workflows/ci.yml)
+[Деплой на Render](https://devops-engineer-from-scratch-project-313-nwat.onrender.com/)
 
 # Сокращатель ссылок, 
 

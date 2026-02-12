@@ -21,9 +21,8 @@ COPY package.json package-lock.json ./
 
 RUN npm ci
 
-COPY build-frontend.sh ./
-
-RUN chmod +x build-frontend.sh && ./build-frontend.sh
+RUN mkdir -p /app/public && \
+    cp -r node_modules/@hexlet/project-devops-deploy-crud-frontend/dist/* /app/public/ || true
 
 FROM python:3.11-slim
 
@@ -47,7 +46,7 @@ COPY main.py config.py models.py database.py schemas.py ./
 
 RUN mkdir -p /app/public
 
-COPY --from=frontend-builder /frontend/dist /app/public
+COPY --from=frontend-builder /app/public /app/public
 
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 
