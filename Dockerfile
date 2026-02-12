@@ -4,18 +4,21 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-SHELL ["/bin/bash", "-c"]
-
-RUN pip install --no-cache-dir uv
-
 WORKDIR /tmp
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml ./
 
-RUN uv pip compile pyproject.toml -o requirements.txt && \
-    python -m venv /opt/venv && \
+RUN python -m venv /opt/venv && \
     /opt/venv/bin/python -m pip install --upgrade pip && \
-    /opt/venv/bin/python -m pip install --no-cache-dir -r requirements.txt
+    /opt/venv/bin/python -m pip install --no-cache-dir \
+        fastapi==0.104.0 \
+        uvicorn[standard]==0.24.0 \
+        sqlmodel==0.0.14 \
+        psycopg2-binary==2.9.0 \
+        asyncpg==0.29.0 \
+        python-dotenv==1.0.0 \
+        pydantic-settings==2.1.0 \
+        aiosqlite==0.19.0
 
 FROM node:20-alpine as frontend-builder
 
@@ -34,13 +37,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH"
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        nginx \
-        supervisor \
-        curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /var/cache/apt/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/cache/apt/*
 
 WORKDIR /app
 
@@ -52,15 +52,9 @@ RUN mkdir -p /app/public
 
 COPY --from=frontend-builder /app/public /app/public
 
-COPY nginx/nginx.conf /etc/nginx/nginx.conf
-
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-RUN mkdir -p /var/log/supervisor /var/run/supervisor
-
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost/ping || exit 1
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
