@@ -9,73 +9,67 @@ help:
 	@echo ""
 	@echo "🚀 Development:"
 	@echo "  make dev              Run frontend and backend simultaneously"
-	@echo "  make run              Run backend only (http://localhost:8080)"
-	@echo "  make install          Install dependencies (Python + Node.js)"
+	@echo "  make run              Run backend only"
+	@echo "  make install          Install dependencies"
 	@echo "  make setup            Setup development environment"
 	@echo ""
 	@echo "🧪 Testing & Quality:"
 	@echo "  make test             Run all tests"
-	@echo "  make test-cov         Run tests with coverage report"
+	@echo "  make test-cov         Run tests with coverage"
 	@echo "  make lint             Check code with Ruff"
 	@echo "  make format           Format code with Ruff"
-	@echo "  make check            Run all checks (lint + test)"
-	@echo ""
-	@echo "🐳 Docker:"
-	@echo "  make docker-build     Build production Docker image"
-	@echo "  make docker-run       Run production Docker container"
-	@echo "  make docker-dev       Run development Docker container"
-	@echo "  make docker-stop      Stop Docker containers"
-	@echo "  make docker-logs      View Docker logs"
-	@echo ""
-	@echo "🗄️  Database:"
-	@echo "  make db-up            Start PostgreSQL in Docker"
-	@echo "  make db-wait          Wait for PostgreSQL to be ready"
-	@echo "  make db-down          Stop PostgreSQL"
-	@echo "  make db-logs          View PostgreSQL logs"
-	@echo ""
-	@echo "🧹 Cleanup:"
-	@echo "  make clean            Clean up cache and build files"
-	@echo "  make setup-dev        Full setup for development"
-	@echo "  make version          Show version information"
+	@echo "  make check            Run all checks"
 	@echo ""
 
 install:
 	@echo "Installing dependencies..."
-	uv sync
-	npm install
+	@python -m pip install --upgrade pip
+	@python -m pip install --no-cache-dir uv
+	@uv pip install --python $(shell which python) --no-cache-dir \
+		fastapi==0.104.0 \
+		uvicorn[standard]==0.24.0 \
+		sqlmodel==0.0.14 \
+		psycopg[binary]==3.1.15 \
+		asyncpg==0.29.0 \
+		python-dotenv==1.0.0 \
+		pydantic-settings==2.1.0 \
+		aiosqlite==0.19.0 \
+		pytest==7.4.0 \
+		pytest-asyncio==0.21.0 \
+		pytest-cov==4.1.0 \
+		httpx==0.25.0 \
+		ruff==0.1.0
+	@npm install
 	@echo "✓ Installation completed"
 
 run:
 	@echo "Starting backend server..."
 	@echo "Backend: http://localhost:8080"
-	@echo "API Docs: http://localhost:8080/docs"
-	uv run uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+	@uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
-dev: db-up db-wait
+dev: install
 	@echo "Starting frontend and backend..."
-	@echo "Frontend: http://localhost:5173"
-	@echo "Backend: http://localhost:8080"
-	npm run dev
+	@npm run dev
 
 test:
 	@echo "Running tests..."
-	uv run pytest tests/ -v --tb=short
+	@pytest tests/ -v --tb=short
 	@echo "✓ Tests completed"
 
 test-cov:
 	@echo "Running tests with coverage..."
-	uv run pytest tests/ -v --cov=. --cov-report=html --cov-report=term
-	@echo "✓ Coverage report generated in htmlcov/index.html"
+	@pytest tests/ -v --cov=. --cov-report=html --cov-report=term
+	@echo "✓ Coverage report generated"
 
 lint:
 	@echo "Checking code with Ruff..."
-	uv run ruff check .
+	@ruff check .
 	@echo "✓ Linting passed"
 
 format:
 	@echo "Formatting code with Ruff..."
-	uv run ruff format .
-	uv run ruff check . --fix
+	@ruff format .
+	@ruff check . --fix
 	@echo "✓ Code formatted"
 
 check: lint test
@@ -83,74 +77,61 @@ check: lint test
 
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t short-links-api:latest .
-	@echo "✓ Docker image built successfully"
+	@docker build -t short-links-api:latest .
+	@echo "✓ Docker image built"
 
-docker-run: db-up db-wait
-	@echo "Starting Docker container (production)..."
-	docker-compose --profile prod up -d app
-	@echo "✓ Application is running on http://localhost"
-
-docker-dev: db-up db-wait
-	@echo "Starting Docker container (development)..."
-	docker-compose --profile dev up -d app-dev
-	@echo "✓ Development environment is running on http://localhost:8080"
+docker-run:
+	@echo "Starting Docker container..."
+	@docker-compose up -d app
+	@echo "✓ Container started on http://localhost"
 
 docker-stop:
 	@echo "Stopping Docker containers..."
-	docker-compose down
-	@echo "✓ Docker containers stopped"
+	@docker-compose down
+	@echo "✓ Containers stopped"
 
 docker-logs:
-	docker-compose logs -f app
+	@docker-compose logs -f app
 
 db-up:
 	@echo "Starting PostgreSQL..."
-	docker-compose up -d db
+	@docker-compose up -d db
 	@echo "✓ PostgreSQL started"
 
 db-wait:
-	@echo "Waiting for PostgreSQL to be ready..."
+	@echo "Waiting for PostgreSQL..."
 	@for i in {1..30}; do \
 		if docker exec short_links_db psql -U postgres -c "SELECT 1" > /dev/null 2>&1; then \
-			echo "✓ PostgreSQL is ready"; \
+			echo "✓ PostgreSQL ready"; \
 			break; \
 		fi; \
-		echo "Waiting... ($$i/30)"; \
 		sleep 1; \
 	done
 
 db-down:
 	@echo "Stopping PostgreSQL..."
-	docker-compose down db
+	@docker-compose down db
 	@echo "✓ PostgreSQL stopped"
 
 db-logs:
-	docker logs -f short_links_db
+	@docker logs -f short_links_db
 
 clean:
 	@echo "Cleaning up..."
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	find . -type f -name "*.pyo" -delete 2>/dev/null || true
-	find . -type f -name ".DS_Store" -delete 2>/dev/null || true
-	rm -rf .pytest_cache .coverage htmlcov dist build *.egg-info 2>/dev/null || true
-	rm -rf node_modules 2>/dev/null || true
-	rm -f database.db 2>/dev/null || true
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@rm -rf .pytest_cache .coverage htmlcov dist build *.egg-info 2>/dev/null || true
 	@echo "✓ Cleanup completed"
 
-setup: clean
+setup: clean install
 	@echo "Setting up development environment..."
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
-		echo "✓ Created .env from .env.example"; \
+		echo "✓ Created .env"; \
 	else \
-		echo "⚠ .env already exists, skipping..."; \
+		echo "⚠ .env already exists"; \
 	fi
-	@echo "Installing Python dependencies..."
-	@uv sync --no-update
-	@echo "Installing Node.js dependencies..."
-	@npm install
+	@echo ""
 	@echo "✓ Setup completed"
 	@echo ""
 	@echo "Next steps:"
@@ -163,10 +144,11 @@ setup-dev: clean install
 	@echo "Setting up development environment..."
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
-		echo "✓ Created .env from .env.example"; \
+		echo "✓ Created .env"; \
 	else \
-		echo "⚠ .env already exists, skipping..."; \
+		echo "⚠ .env already exists"; \
 	fi
+	@echo ""
 	@echo "✓ Setup completed"
 	@echo ""
 	@echo "Next steps:"
@@ -183,7 +165,4 @@ version:
 	@echo "  Python: $$(python --version 2>&1)"
 	@echo "  Node.js: $$(node --version)"
 	@echo "  npm: $$(npm --version)"
-	@echo ""
-	@which docker > /dev/null && echo "  Docker: $$(docker --version)" || echo "  Docker: not installed"
-	@which docker-compose > /dev/null && echo "  Docker Compose: $$(docker-compose --version)" || echo "  Docker Compose: not installed"
 	@echo ""
