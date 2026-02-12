@@ -139,7 +139,7 @@ clean:
 	rm -f database.db 2>/dev/null || true
 	@echo "✓ Cleanup completed"
 
-setup: clean install
+setup: clean
 	@echo "Setting up development environment..."
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
@@ -147,6 +147,10 @@ setup: clean install
 	else \
 		echo "⚠ .env already exists, skipping..."; \
 	fi
+	@echo "Installing Python dependencies..."
+	@uv sync --no-update
+	@echo "Installing Node.js dependencies..."
+	@npm install
 	@echo "✓ Setup completed"
 	@echo ""
 	@echo "Next steps:"
