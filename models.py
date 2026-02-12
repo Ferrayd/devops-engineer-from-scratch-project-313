@@ -5,7 +5,6 @@ from sqlmodel import Field, SQLModel
 
 
 class Link(SQLModel, table=True):
-
     __tablename__ = "links"
 
     model_config = ConfigDict(
@@ -21,12 +20,5 @@ class Link(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     original_url: str = Field(index=False, description="Оригинальный URL")
-    short_name: str = Field(
-        unique=True,
-        index=True,
-        description="Уникальное короткое имя"
-    )
-    created_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="Дата создания"
-    )
+    short_name: str = Field(unique=True, index=True, description="Уникальное короткое имя")
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="Дата создания")

@@ -2,7 +2,6 @@ import pytest
 
 
 class TestLinksCreate:
-
     @pytest.mark.asyncio
     async def test_create_link_success(self, async_client):
         link_data = {
@@ -54,7 +53,6 @@ class TestLinksCreate:
 
 
 class TestLinksRead:
-
     @pytest.mark.asyncio
     async def test_get_all_links_empty(self, async_client):
         response = await async_client.get("/api/links")
@@ -88,7 +86,6 @@ class TestLinksRead:
 
 
 class TestLinksUpdate:
-
     @pytest.mark.asyncio
     async def test_update_link_success(self, async_client, sample_links):
         link_id = sample_links[0].id
@@ -129,7 +126,6 @@ class TestLinksUpdate:
 
 
 class TestLinksDelete:
-
     @pytest.mark.asyncio
     async def test_delete_link_success(self, async_client, sample_links):
         link_id = sample_links[0].id
@@ -148,7 +144,6 @@ class TestLinksDelete:
 
 
 class TestPagination:
-
     @pytest.mark.asyncio
     async def test_pagination_first_page(self, async_client, sample_links):
         response = await async_client.get("/api/links?range=[0,3]")
@@ -178,7 +173,6 @@ class TestPagination:
 
 
 class TestErrorHandling:
-
     @pytest.mark.asyncio
     async def test_404_not_found(self, async_client):
         response = await async_client.get("/api/links/999")
@@ -207,7 +201,6 @@ class TestErrorHandling:
 
 
 class TestResponseFormat:
-
     @pytest.mark.asyncio
     async def test_link_response_has_all_fields(self, async_client):
         link_data = {

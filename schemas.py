@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class LinkCreate(BaseModel):
-
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -14,20 +13,13 @@ class LinkCreate(BaseModel):
         }
     )
 
-    original_url: HttpUrl = Field(
-        ...,
-        description="Оригинальный URL (должен быть валидным)"
-    )
+    original_url: HttpUrl = Field(..., description="Оригинальный URL (должен быть валидным)")
     short_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=255,
-        description="Уникальное короткое имя ссылки"
+        ..., min_length=1, max_length=255, description="Уникальное короткое имя ссылки"
     )
 
 
 class LinkResponse(BaseModel):
-
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

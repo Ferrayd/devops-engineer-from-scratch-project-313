@@ -5,18 +5,13 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-
     port: int = Field(default=8080, description="Порт сервера")
     environment: str = Field(default="development", description="Окружение")
 
-    database_url: str = Field(
-        default="sqlite:///./database.db",
-        description="URL подключения к БД"
-    )
+    database_url: str = Field(default="sqlite:///./database.db", description="URL подключения к БД")
 
     short_url_base: str = Field(
-        default="http://localhost:8080/r",
-        description="Базовый URL для коротких ссылок"
+        default="http://localhost:8080/r", description="Базовый URL для коротких ссылок"
     )
 
     cors_origins: list[str] = Field(
@@ -24,12 +19,10 @@ class Settings(BaseSettings):
             "http://localhost:5173",
             "http://localhost:8080",
         ],
-        description="Допустимые origins для CORS"
+        description="Допустимые origins для CORS",
     )
     cors_credentials: bool = Field(default=True)
-    cors_methods: list[str] = Field(
-        default=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    )
+    cors_methods: list[str] = Field(default=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
     cors_headers: list[str] = Field(default=["*"])
 
     def __init__(self, **data):
