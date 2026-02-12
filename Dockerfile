@@ -7,16 +7,16 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
-        libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+        libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR /tmp
+WORKDIR /app
 
 COPY pyproject.toml ./
 
 RUN python -m venv /opt/venv && \
-    /opt/venv/bin/python -m pip install --upgrade pip && \
-    /opt/venv/bin/python -m pip install --no-cache-dir \
+    /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir \
         fastapi==0.104.0 \
         uvicorn[standard]==0.24.0 \
         sqlmodel==0.0.14 \
@@ -46,8 +46,8 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libpq5 \
-        curl \
-    && rm -rf /var/lib/apt/lists/* && \
+        curl && \
+    rm -rf /var/lib/apt/lists/* && \
     rm -rf /var/cache/apt/*
 
 WORKDIR /app
@@ -55,8 +55,6 @@ WORKDIR /app
 COPY --from=python-builder /opt/venv /opt/venv
 
 COPY main.py config.py models.py database.py schemas.py ./
-
-RUN mkdir -p /app/public
 
 COPY --from=frontend-builder /app/public /app/public
 
