@@ -56,9 +56,7 @@ async def init_db():
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async_session_maker = async_sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
+    async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session_maker() as session:
         yield session
 
@@ -88,12 +86,7 @@ async def get_paginated_links(
     count_result = await session.execute(count_statement)
     total = count_result.scalar() or 0
 
-    statement = (
-        select(Link)
-        .order_by(Link.id)
-        .offset(start)
-        .limit(end - start)
-    )
+    statement = select(Link).order_by(Link.id).offset(start).limit(end - start)
     result = await session.execute(statement)
     links = result.scalars().all()
 
