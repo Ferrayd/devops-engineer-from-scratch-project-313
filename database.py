@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator
+from typing import AsyncGenerator, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool, StaticPool
@@ -11,16 +11,26 @@ from models import Link
 def get_async_database_url(database_url: str) -> str:
     if database_url.startswith("sqlite"):
         return database_url.replace("sqlite:///", "sqlite+aiosqlite:///")
-
+    
     if database_url.startswith("postgresql://"):
-        return database_url.replace("postgresql://", "postgresql+asyncpg://")
+        url = database_url.replace("postgresql://", "postgresql+asyncpg://")
     elif database_url.startswith("postgres://"):
-        return database_url.replace("postgres://", "postgresql+asyncpg://")
-
-    return database_url
+        url = database_url.replace("postgres://", "postgresql+asyncpg://")
+    else:
+        return database_url
+    
+    if "?sslmode=" in url:
+        url = url.split("?sslmode=")[0]
+    elif "&sslmode=" in url:
+        url = url.replace("&sslmode=disable", "")
+        url = url.replace("&sslmode=require", "")
+    
+    return url
 
 
 async_database_url = get_async_database_url(settings.database_url)
+
+print(f"Using database: {async_database_url[:50]}...")
 
 if async_database_url.startswith("sqlite"):
     engine = create_async_engine(
@@ -46,7 +56,9 @@ async def init_db():
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async_session_maker = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
     async with async_session_maker() as session:
         yield session
 
@@ -71,15 +83,20 @@ async def get_all_links(session: AsyncSession) -> list[Link]:
 
 async def get_paginated_links(
     session: AsyncSession, start: int = 0, end: int = 10
-) -> tuple[list[Link], int]:
+) -> Tuple[list[Link], int]:
     count_statement = select(func.count(Link.id))
     count_result = await session.execute(count_statement)
     total = count_result.scalar() or 0
-
-    statement = select(Link).order_by(Link.id).offset(start).limit(end - start)
+    
+    statement = (
+        select(Link)
+        .order_by(Link.id)
+        .offset(start)
+        .limit(end - start)
+    )
     result = await session.execute(statement)
     links = result.scalars().all()
-
+    
     return links, total
 
 
@@ -96,7 +113,7 @@ async def update_link(
     link = await get_link_by_id(session, link_id)
     if not link:
         return None
-
+    
     link.original_url = original_url
     link.short_name = short_name
     await session.commit()
@@ -108,7 +125,7 @@ async def delete_link(session: AsyncSession, link_id: int) -> bool:
     link = await get_link_by_id(session, link_id)
     if not link:
         return False
-
+    
     await session.delete(link)
     await session.commit()
     return True
