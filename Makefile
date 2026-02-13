@@ -1,6 +1,6 @@
 .PHONY: help install run dev test test-cov lint format check \
         docker-build docker-run docker-dev docker-stop docker-logs \
-        db-up db-wait db-down db-logs clean setup-dev version setup
+        db-up db-wait db-down db-logs clean setup-dev version
 
 help:
 	@echo "╔═══════════════════════════════════════════════════════════╗"
@@ -10,123 +10,167 @@ help:
 	@echo "🚀 Development:"
 	@echo "  make dev              Run frontend and backend simultaneously"
 	@echo "  make run              Run backend only"
-	@echo "  make install          Install dependencies"
-	@echo "  make setup            Setup development environment"
+	@echo "  make install          Install dependencies (Python + Node.js)"
 	@echo ""
 	@echo "🧪 Testing & Quality:"
 	@echo "  make test             Run all tests"
-	@echo "  make test-cov         Run tests with coverage"
+	@echo "  make test-cov         Run tests with coverage report"
 	@echo "  make lint             Check code with Ruff"
 	@echo "  make format           Format code with Ruff"
-	@echo "  make check            Run all checks"
+	@echo "  make check            Run all checks (lint + test)"
+	@echo ""
+	@echo "🐳 Docker:"
+	@echo "  make docker-build     Build production Docker image"
+	@echo "  make docker-run       Run production Docker container"
+	@echo "  make docker-dev       Run development Docker container"
+	@echo "  make docker-stop      Stop Docker containers"
+	@echo "  make docker-logs      View Docker logs"
+	@echo ""
+	@echo "🗄️  Database:"
+	@echo "  make db-up            Start PostgreSQL in Docker"
+	@echo "  make db-wait          Wait for PostgreSQL to be ready"
+	@echo "  make db-down          Stop PostgreSQL"
+	@echo "  make db-logs          View PostgreSQL logs"
+	@echo ""
+	@echo "🧹 Cleanup:"
+	@echo "  make clean            Clean up cache and build files"
+	@echo "  make setup-dev        Full setup for development"
 	@echo ""
 
-install:
+check-deps:
+	@which python3 > /dev/null || (echo "Python3 not found" && exit 1)
+	@which npm > /dev/null || (echo "npm not found" && exit 1)
+	@which node > /dev/null || (echo "Node.js not found" && exit 1)
+
+install: check-deps
 	@echo "Installing Python dependencies..."
-	python -m pip install --upgrade pip
-	python -m pip install --no-cache-dir \
-		fastapi==0.104.0 \
-		uvicorn[standard]==0.24.0 \
-		sqlmodel==0.0.14 \
-		psycopg[binary]==3.1.15 \
-		asyncpg==0.29.0 \
-		python-dotenv==1.0.0 \
-		pydantic-settings==2.1.0 \
-		aiosqlite==0.19.0 \
-		pytest==7.4.0 \
-		pytest-asyncio==0.21.0 \
-		pytest-cov==4.1.0 \
-		httpx==0.25.0 \
-		ruff==0.1.0
+	@if [ -f pyproject.toml ]; then \
+		python3 -m pip install --upgrade pip; \
+		python3 -m pip install uv; \
+		uv sync; \
+	else \
+		echo "⚠ pyproject.toml not found"; \
+		exit 1; \
+	fi
 	@echo "Installing Node.js dependencies..."
 	npm install
-	@echo "✓ All dependencies installed"
+	@echo "✓ Installation completed"
 
 run:
 	@echo "Starting backend server..."
-	uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+	@echo "Backend: http://localhost:8080"
+	@echo "API Docs: http://localhost:8080/docs"
+	uv run uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
-dev: install
+dev: db-up db-wait
 	@echo "Starting frontend and backend..."
+	@echo "Frontend: http://localhost:5173"
+	@echo "Backend: http://localhost:8080"
 	npm run dev
 
 test:
 	@echo "Running tests..."
-	pytest tests/ -v --tb=short
+	uv run pytest tests/ -v --tb=short
 
 test-cov:
 	@echo "Running tests with coverage..."
-	pytest tests/ -v --cov=. --cov-report=html --cov-report=term
+	uv run pytest tests/ -v --cov=. --cov-report=html --cov-report=term
+	@echo "✓ Coverage report generated in htmlcov/index.html"
 
 lint:
 	@echo "Checking code with Ruff..."
-	ruff check .
+	uv run ruff check .
 
 format:
 	@echo "Formatting code with Ruff..."
-	ruff format .
-	ruff check . --fix
+	uv run ruff format .
+	uv run ruff check . --fix
 
 check: lint test
 	@echo "✓ All checks passed!"
 
 docker-build:
+	@echo "Building Docker image..."
 	docker build -t short-links-api:latest .
+	@echo "✓ Docker image built successfully"
 
-docker-run:
+docker-run: db-up db-wait
+	@echo "Running production Docker container..."
 	docker-compose up -d app
+	@echo "✓ Application is running on http://localhost"
+
+docker-dev: db-up db-wait
+	@echo "Running development Docker container..."
+	docker-compose --profile dev up -d app-dev
+	@echo "✓ Development environment is running"
 
 docker-stop:
+	@echo "Stopping Docker containers..."
 	docker-compose down
+	@echo "✓ Docker containers stopped"
 
 docker-logs:
 	docker-compose logs -f app
 
 db-up:
+	@echo "Starting PostgreSQL..."
 	docker-compose up -d db
+	@echo "✓ PostgreSQL started"
 
 db-wait:
+	@echo "Waiting for PostgreSQL to be ready..."
 	@for i in {1..30}; do \
 		if docker exec short_links_db psql -U postgres -c "SELECT 1" > /dev/null 2>&1; then \
-			echo "✓ PostgreSQL ready"; \
+			echo "✓ PostgreSQL is ready"; \
 			break; \
 		fi; \
+		echo "Waiting... ($$i/30)"; \
 		sleep 1; \
 	done
 
 db-down:
+	@echo "Stopping PostgreSQL..."
 	docker-compose down db
+	@echo "✓ PostgreSQL stopped"
 
 db-logs:
 	docker logs -f short_links_db
 
 clean:
+	@echo "Cleaning up..."
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	find . -type f -name ".DS_Store" -delete 2>/dev/null || true
 	rm -rf .pytest_cache .coverage htmlcov dist build *.egg-info 2>/dev/null || true
-
-setup: clean install
-	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo "✓ Created .env from .env.example"; \
-	else \
-		echo "⚠ .env already exists"; \
-	fi
-	@echo ""
-	@echo "✓ Setup completed! You can now run:"
-	@echo "  make dev   - Start development server"
-	@echo "  make test  - Run tests"
-	@echo "  make check - Run all checks"
+	rm -rf node_modules 2>/dev/null || true
+	rm -f database.db 2>/dev/null || true
+	@echo "✓ Cleanup completed"
 
 setup-dev: clean install
+	@echo "Setting up development environment..."
 	@if [ ! -f .env ]; then \
 		cp .env.example .env; \
 		echo "✓ Created .env from .env.example"; \
 	else \
-		echo "⚠ .env already exists"; \
+		echo "⚠ .env already exists, skipping..."; \
 	fi
+	@echo "✓ Setup completed"
 	@echo ""
-	@echo "✓ Setup completed! You can now run:"
-	@echo "  make dev   - Start development server"
-	@echo "  make test  - Run tests"
-	@echo "  make check - Run all checks"
+	@echo "Next steps:"
+	@echo "  make dev        - Start development server"
+	@echo "  make test       - Run tests"
+	@echo "  make check      - Run all checks"
+	@echo ""
+
+version:
+	@echo "Short Links API"
+	@echo "Version: 1.0.0"
+	@echo ""
+	@echo "Dependencies:"
+	python3 --version
+	node --version
+	npm --version
+	@echo ""
+	@which docker > /dev/null && docker --version || echo "Docker: not installed"
+	@echo ""
