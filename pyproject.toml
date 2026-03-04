@@ -35,7 +35,7 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = []
+packages = ["app"]
 
 [tool.ruff]
 line-length = 100

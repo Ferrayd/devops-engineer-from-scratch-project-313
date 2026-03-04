@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool, StaticPool
 from sqlmodel import SQLModel, func, select
 
-from config import settings
-from models import Link
+from app.config import settings
+from app.models import Link
 
 
 def get_async_database_url(database_url: str) -> str:

@@ -1,60 +1,20 @@
-from contextlib import asynccontextmanager
-from pathlib import Path
-
-from fastapi import Depends, FastAPI, HTTPException, Query, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import settings
-from database import (
+from app.config import settings
+from app.database import (
     create_link,
     delete_link,
     get_link_by_id,
     get_link_by_short_name,
     get_paginated_links,
     get_session,
-    init_db,
     update_link,
 )
-from models import Link
-from schemas import LinkCreate, LinkResponse
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
-    print("✓ Database initialized")
-    print(f"✓ CORS enabled for origins: {settings.cors_origins}")
-    yield
-    print("✓ Application shutting down")
-
-
-app = FastAPI(
-    title="Short Links API",
-    description="REST API для создания и управления короткими ссылками",
-    version="1.0.0",
-    lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=settings.cors_credentials,
-    allow_methods=settings.cors_methods,
-    allow_headers=settings.cors_headers,
-)
-
-
-public_path = Path(__file__).parent / "public"
-if public_path.exists():
-    app.mount("/assets", StaticFiles(directory=str(public_path / "assets")), name="assets")
+from app.models import Link
+from app.schemas import LinkCreate, LinkResponse
 
 
 def parse_range_header(range_header: str | None) -> tuple[int, int]:
@@ -89,12 +49,10 @@ def format_link_response(link: Link) -> dict:
     }
 
 
-@app.get("/ping")
 async def ping():
     return "pong"
 
 
-@app.get("/api/links")
 async def list_links(
     range: str | None = Query(None, description="Диапазон в формате [start,end], например [0,10]"),
     session: AsyncSession = Depends(get_session),
@@ -121,7 +79,6 @@ async def list_links(
     )
 
 
-@app.post("/api/links", response_model=LinkResponse, status_code=status.HTTP_201_CREATED)
 async def create_short_link(link_data: LinkCreate, session: AsyncSession = Depends(get_session)):
     existing = await get_link_by_short_name(session, link_data.short_name)
     if existing:
@@ -152,7 +109,6 @@ async def create_short_link(link_data: LinkCreate, session: AsyncSession = Depen
         ) from err
 
 
-@app.get("/api/links/{link_id}", response_model=LinkResponse)
 async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
     link = await get_link_by_id(session, link_id)
     if not link:
@@ -170,7 +126,6 @@ async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
     )
 
 
-@app.put("/api/links/{link_id}", response_model=LinkResponse)
 async def update_short_link(
     link_id: int,
     link_data: LinkCreate,
@@ -213,7 +168,6 @@ async def update_short_link(
         ) from err
 
 
-@app.delete("/api/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_short_link(link_id: int, session: AsyncSession = Depends(get_session)):
     success = await delete_link(session, link_id)
     if not success:
@@ -221,33 +175,3 @@ async def delete_short_link(link_id: int, session: AsyncSession = Depends(get_se
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Link not found",
         )
-
-
-@app.get("/{full_path:path}")
-async def serve_static_or_spa(full_path: str):
-    public_path = Path(__file__).parent / "public"
-
-    if full_path == "" or full_path == "/":
-        index_file = public_path / "index.html"
-        if index_file.exists():
-            return FileResponse(index_file, media_type="text/html")
-        return {"message": "Welcome to Short Links API"}
-
-    file_path = public_path / full_path
-
-    try:
-        file_path = file_path.resolve()
-        public_path = public_path.resolve()
-        if file_path.is_relative_to(public_path) and file_path.is_file():
-            return FileResponse(file_path)
-    except (ValueError, RuntimeError):
-        pass
-
-    index_file = public_path / "index.html"
-    if index_file.exists():
-        return FileResponse(index_file, media_type="text/html")
-
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Not found",
-    )

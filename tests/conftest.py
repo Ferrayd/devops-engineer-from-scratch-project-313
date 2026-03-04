@@ -8,10 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 
-from config import settings
-from database import get_session
-from main import app
-from models import Link
+from app.config import settings
+from app.database import get_session
+from app.main import app
+from app.models import Link
 
 
 project_root = Path(__file__).parent.parent
