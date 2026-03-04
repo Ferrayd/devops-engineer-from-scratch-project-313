@@ -29,7 +29,8 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+    working_dir: /app
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/ping"]
       interval: 10s
@@ -45,7 +46,8 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-    command: pytest
+    working_dir: /app
+    command: pytest tests/
     profiles:
       - test
 
