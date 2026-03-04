@@ -3,7 +3,6 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
-    container_name: short_links_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -17,55 +16,38 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-    networks:
-      - app-network
 
   app:
     build: .
-    container_name: short_links_app
     ports:
-      - "80:80"
+      - "8080:80"
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/short_links
-      SHORT_URL_BASE: https://short.io/r
-      ENVIRONMENT: production
-      CORS_ORIGINS: '["http://localhost", "http://127.0.0.1"]'
+      PYTHONUNBUFFERED: 1
     depends_on:
       db:
         condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - app-network
-    profiles:
-      - prod
-
-  app-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    container_name: short_links_app_dev
-    ports:
-      - "8080:8080"
-      - "5173:5173"
-    environment:
-      DATABASE_URL: sqlite:///./database.db
-      SHORT_URL_BASE: http://localhost:8080
-      ENVIRONMENT: development
-      CORS_ORIGINS: '["http://localhost:5173", "http://localhost:8080", "http://10.0.2.15:5173"]'
     volumes:
       - .:/app
-      - /app/node_modules
-    restart: unless-stopped
-    networks:
-      - app-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  test:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/short_links_test
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: pytest
     profiles:
-      - dev
+      - test
 
 volumes:
   postgres_data:
-    driver: local
-
-networks:
-  app-network:
-    driver: bridge
