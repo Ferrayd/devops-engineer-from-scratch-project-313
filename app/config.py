@@ -1,4 +1,5 @@
 import json
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./database.db", description="URL подключения к БД")
 
     short_url_base: str = Field(
-        default="http://localhost:8080",
+        default="http://localhost:8080/r",
         description="Базовый URL для коротких ссылок",
     )
 

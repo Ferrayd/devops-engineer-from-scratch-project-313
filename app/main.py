@@ -13,6 +13,7 @@ from app.routes import (
     get_link,
     list_links,
     ping,
+    redirect_short_link,
     update_short_link,
 )
 from app.schemas import LinkResponse
@@ -52,8 +53,9 @@ public_path = Path(__file__).parent.parent / "public"
 if public_path.exists():
     app.mount("/assets", StaticFiles(directory=str(public_path / "assets")), name="assets")
 
-
 app.get("/ping")(ping)
+
+app.get("/r/{short_code}")(redirect_short_link)
 
 app.get("/api/links")(list_links)
 
@@ -69,4 +71,4 @@ app.delete("/api/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)(
     delete_short_link
 )
 
-app.get("/{full_path:path}", name="serve_spa")(serve_static_or_spa)
+app.get("/{full_path:path}")(serve_static_or_spa)

@@ -181,6 +181,7 @@ async def redirect_short_link(
     short_code: str,
     session: AsyncSession = Depends(get_session),
 ):
+
     excluded_paths = {"api", "docs", "redoc", "openapi.json", "assets", "ping"}
 
     if short_code in excluded_paths:
