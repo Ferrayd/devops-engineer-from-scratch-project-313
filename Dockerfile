@@ -13,9 +13,9 @@ RUN apt-get update && \
 WORKDIR /app
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
+ENV PATH="/root/.cargo/bin:$PATH"
 
-COPY . .
+COPY pyproject.toml uv.lock ./
 
 RUN uv sync --frozen --no-dev
 
