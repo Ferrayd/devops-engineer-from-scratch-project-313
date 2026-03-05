@@ -19,7 +19,7 @@
 
 ## Требования
 
-- Python 3.11+
+- Python 3.14
 - Node.js 20+ (для фронтенда)
 - Docker и Docker Compose (опционально)
 
