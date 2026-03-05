@@ -1,4 +1,3 @@
-FROM myapp-frontend:latest as frontend
 FROM python:3.11-slim as python-builder
 
 ENV PYTHONUNBUFFERED=1 \
@@ -37,9 +36,8 @@ WORKDIR /app
 COPY --from=python-builder /app/.venv /app/.venv
 
 COPY app ./app
-COPY public ./public 2>/dev/null || true
 
-COPY --from=frontend-builder /app/public /app/public
+COPY public ./public
 
 EXPOSE 80
 
