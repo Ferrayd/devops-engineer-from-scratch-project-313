@@ -56,7 +56,11 @@ async def init_db():
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async_session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
     async with async_session_maker() as session:
         yield session
 
@@ -68,7 +72,7 @@ async def get_link_by_id(session: AsyncSession, link_id: int) -> Link | None:
 
 
 async def get_link_by_short_name(session: AsyncSession, short_name: str) -> Link | None:
-    statement = select(Link).where(Link.short_name == short_name)
+    statement = select(Link).where(Link.short_name.ilike(short_name))
     result = await session.execute(statement)
     return result.scalar_one_or_none()
 
