@@ -14,6 +14,7 @@ from app.routes import (
     list_links,
     ping,
     update_short_link,
+    redirect_short_link,
 )
 from app.schemas import LinkResponse
 from app.static_routes import serve_static_or_spa
@@ -65,6 +66,10 @@ app.get("/api/links/{link_id}", response_model=LinkResponse)(get_link)
 
 app.put("/api/links/{link_id}", response_model=LinkResponse)(update_short_link)
 
-app.delete("/api/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)(delete_short_link)
+app.delete("/api/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)(
+    delete_short_link
+)
+
+app.get("/{short_code}")(redirect_short_link)
 
 app.get("/{full_path:path}")(serve_static_or_spa)
