@@ -12,7 +12,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    export PATH="/root/.cargo/bin:$PATH"
+
 ENV PATH="/root/.cargo/bin:$PATH"
 
 COPY pyproject.toml uv.lock ./
