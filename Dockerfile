@@ -12,14 +12,15 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-RUN python -m venv /.venv
-ENV PATH="/app/.venv/bin:$PATH"
-
 COPY pyproject.toml ./
-RUN pip install --upgrade pip && \
-    pip install -e . --no-build-isolation
-
 COPY app ./app
+
+RUN python -m venv .venv
+ENV PATH="./.venv/bin:$PATH"
+
+RUN pip install --upgrade pip && \
+    pip install -e .
+
 COPY public ./public
 
 EXPOSE 8080
@@ -27,4 +28,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8080/ping || exit 1
 
-CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
