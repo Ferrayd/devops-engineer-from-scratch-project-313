@@ -182,21 +182,21 @@ async def redirect_short_link(
     session: AsyncSession = Depends(get_session),
 ):
     excluded_paths = {"api", "docs", "redoc", "openapi.json", "assets", "ping"}
-    
+
     if short_code in excluded_paths:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Not found",
         )
-    
+
     link = await get_link_by_short_name(session, short_code)
-    
+
     if not link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Short link not found",
         )
-    
+
     return RedirectResponse(
         url=link.original_url,
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
