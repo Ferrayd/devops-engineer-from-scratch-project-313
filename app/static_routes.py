@@ -1,13 +1,30 @@
 from pathlib import Path
 
-from fastapi import HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi import Depends, HTTPException, status
+from fastapi.responses import FileResponse, RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_link_by_short_name, get_session
 
 
-async def serve_static_or_spa(full_path: str):
+EXCLUDED_PATHS = {
+    "api",
+    "docs",
+    "redoc",
+    "openapi.json",
+    "assets",
+    "ping",
+}
+
+
+async def serve_static_or_spa(
+    full_path: str,
+    session: AsyncSession = Depends(get_session),
+):
     public_path = Path(__file__).parent.parent / "public"
 
-    if full_path.startswith("api/"):
+    first_segment = full_path.split("/")[0] if full_path else ""
+    if first_segment in EXCLUDED_PATHS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Not found",
@@ -29,6 +46,16 @@ async def serve_static_or_spa(full_path: str):
             return FileResponse(file_path)
     except (ValueError, RuntimeError):
         pass
+
+    short_code = first_segment
+    if short_code and "." not in short_code:
+        link = await get_link_by_short_name(session, short_code)
+
+        if link:
+            return RedirectResponse(
+                url=link.original_url,
+                status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            )
 
     index_file = public_path / "index.html"
     if index_file.exists():
