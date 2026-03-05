@@ -12,7 +12,7 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-RUN python -m venv /app/.venv
+RUN python -m venv /.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY pyproject.toml ./
