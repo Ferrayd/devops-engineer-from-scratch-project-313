@@ -67,8 +67,6 @@ app.get("/api/links/{link_id}", response_model=LinkResponse)(get_link)
 
 app.put("/api/links/{link_id}", response_model=LinkResponse)(update_short_link)
 
-app.delete("/api/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)(
-    delete_short_link
-)
+app.delete("/api/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)(delete_short_link)
 
 app.get("/{full_path:path}")(serve_static_or_spa)
