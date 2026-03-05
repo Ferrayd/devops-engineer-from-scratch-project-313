@@ -1,18 +1,7 @@
-FROM node:20-alpine as frontend-builder
-
-WORKDIR /frontend
-
-COPY package.json package-lock.json ./
-
-RUN npm ci
-
-RUN npm run build
-
 FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -26,13 +15,11 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY app ./app
 
-RUN python -m venv .venv
-ENV PATH="./.venv/bin:$PATH"
+RUN python -m venv .venv && \
+    ./.venv/bin/pip install --upgrade pip && \
+    ./.venv/bin/pip install -e .
 
-RUN pip install --upgrade pip && \
-    pip install -e .
-
-COPY --from=frontend-builder /frontend/dist ./public
+COPY public ./public
 
 EXPOSE 8080
 
