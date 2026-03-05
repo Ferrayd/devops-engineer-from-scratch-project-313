@@ -1,8 +1,18 @@
+FROM node:20-alpine as frontend-builder
+
+WORKDIR /frontend
+
+COPY package.json package-lock.json ./
+
+RUN npm ci
+
+RUN npm run build
+
 FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="./.venv/bin:$PATH"
+    PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -22,11 +32,11 @@ ENV PATH="./.venv/bin:$PATH"
 RUN pip install --upgrade pip && \
     pip install -e .
 
-COPY public ./public
+COPY --from=frontend-builder /frontend/dist ./public
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8080/ping || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
