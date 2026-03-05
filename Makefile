@@ -60,7 +60,7 @@ run:
 	@echo "Starting backend server..."
 	@echo "Backend: http://localhost:8080"
 	@echo "API Docs: http://localhost:8080/docs"
-	uv run uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+	uv run uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 
 dev: db-up db-wait
 	@echo "Starting frontend and backend..."
