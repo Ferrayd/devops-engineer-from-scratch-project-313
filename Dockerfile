@@ -12,12 +12,19 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+# Устанавливаем UV
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
-COPY pyproject.toml uv.lock ./
+# Копируем ВСЕ файлы (включая app/) перед установкой зависимостей
+COPY . .
 
+# Теперь uv может найти папку 'app' и установить зависимости
 RUN uv sync --frozen --no-dev
+
+# ============================================
+# Финальный stage
+# ============================================
 
 FROM python:3.11-slim
 
@@ -33,10 +40,11 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+# Копируем готовое виртуальное окружение из builder stage
 COPY --from=python-builder /app/.venv /app/.venv
 
+# Копируем только необходимый код приложения
 COPY app ./app
-
 COPY public ./public
 
 EXPOSE 80
