@@ -1,72 +1,53 @@
+import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-from fastapi import FastAPI, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
 from app.database import init_db
-from app.routes import (
-    create_short_link,
-    delete_short_link,
-    get_link,
-    list_links,
-    ping,
-    redirect_short_link,
-    update_short_link,
+from app.routes import health, links
+
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-from app.schemas import LinkResponse
-from app.static_routes import serve_static_or_spa
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Starting up application")
     await init_db()
-    print("✓ Database initialized")
-    print(f"✓ CORS enabled for origins: {settings.cors_origins}")
+    logger.info("Database initialized")
     yield
-    print("✓ Application shutting down")
+    logger.info("Shutting down application")
 
 
 app = FastAPI(
-    title="Short Links API",
-    description="REST API для создания и управления короткими ссылками",
-    version="1.0.0",
-    lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    title="URL Shortener", description="URL Shortener Service", version="1.0.0", lifespan=lifespan
 )
-
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=settings.cors_credentials,
-    allow_methods=settings.cors_methods,
-    allow_headers=settings.cors_headers,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
+app.include_router(health.router, tags=["health"])
 
-public_path = Path(__file__).parent.parent / "public"
-if public_path.exists():
-    app.mount("/assets", StaticFiles(directory=str(public_path / "assets")), name="assets")
+app.include_router(links.router, prefix="/api", tags=["links"])
 
-app.get("/ping")(ping)
 
-app.get("/r/{short_code}")(redirect_short_link)
+@app.get("/", tags=["root"])
+async def root():
+    logger.info("Root endpoint called")
+    return {"message": "Welcome to URL Shortener", "version": "1.0.0", "docs": "/docs"}
 
-app.get("/api/links")(list_links)
 
-app.post("/api/links", response_model=LinkResponse, status_code=status.HTTP_201_CREATED)(
-    create_short_link
-)
+if __name__ == "__main__":
+    import uvicorn
 
-app.get("/api/links/{link_id}", response_model=LinkResponse)(get_link)
-
-app.put("/api/links/{link_id}", response_model=LinkResponse)(update_short_link)
-
-app.delete("/api/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)(delete_short_link)
-
-app.get("/{full_path:path}")(serve_static_or_spa)
+    logger.info("Starting Uvicorn server")
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

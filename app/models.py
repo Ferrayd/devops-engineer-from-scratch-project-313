@@ -1,24 +1,16 @@
-from datetime import datetime
+from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy.sql import func
 
-from pydantic import ConfigDict
-from sqlmodel import Field, SQLModel
+from app.database import Base
 
 
-class Link(SQLModel, table=True):
-    __tablename__ = "links"
+class ShortenedLink(Base):
+    __tablename__ = "shortened_links"
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "id": 1,
-                "original_url": "https://example.com/long-url",
-                "short_name": "exmpl",
-                "created_at": "2024-01-15T10:30:00",
-            }
-        }
-    )
+    id = Column(Integer, primary_key=True, index=True)
+    short_code = Column(String(10), unique=True, index=True, nullable=False)
+    original_url = Column(String(2048), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    id: int | None = Field(default=None, primary_key=True)
-    original_url: str = Field(index=False, description="Оригинальный URL")
-    short_name: str = Field(unique=True, index=True, description="Уникальное короткое имя")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="Дата создания")
+    def __repr__(self):
+        return f"<ShortenedLink(short_code={self.short_code}, original_url={self.original_url})>"

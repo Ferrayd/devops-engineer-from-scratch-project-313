@@ -1,29 +1,36 @@
-FROM python:3.14-slim
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        build-essential \
-        libpq-dev \
-        curl && \
-    rm -rf /var/lib/apt/lists/*
+FROM python:3.14-slim as builder
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY app ./app
+RUN pip install uv
 
-RUN python -m venv .venv && \
-    ./.venv/bin/pip install --upgrade pip && \
-    ./.venv/bin/pip install -e .
+COPY requirements.txt .
 
-COPY public ./public
+RUN uv pip install --no-cache-dir -r requirements.txt
 
-EXPOSE 8080
+FROM python:3.14-slim
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/ping || exit 1
+WORKDIR /app
 
-CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+RUN apt-get update && \
+    apt-get install -y nginx supervisor && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+COPY app/ /app/app/
+COPY requirements.txt /app/
+
+COPY nginx.conf /etc/nginx/sites-available/default
+
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+COPY app/static/ /app/static/
+
+RUN mkdir -p /var/log/nginx /var/run/nginx
+
+EXPOSE 80
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
