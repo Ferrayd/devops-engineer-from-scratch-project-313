@@ -6,7 +6,9 @@ RUN pip install uv
 
 COPY requirements.txt .
 
-RUN uv pip install --no-cache-dir -r requirements.txt
+RUN uv venv
+
+RUN . .venv/bin/activate && uv pip install --no-cache-dir -r requirements.txt
 
 
 FROM python:3.14-slim
@@ -18,8 +20,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /app/.venv /app/.venv
 
 COPY app/ /app/app/
 COPY requirements.txt /app/
@@ -29,6 +30,8 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY public ./public
 
 RUN mkdir -p /var/log/nginx /var/log/supervisor /var/log/uvicorn /var/run/nginx
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 80
 
