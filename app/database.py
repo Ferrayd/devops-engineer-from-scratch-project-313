@@ -1,20 +1,19 @@
 import logging
 import os
-
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Session, sessionmaker
-
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./shortener.db")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://user:password@db:5432/shortener"
+)
 
 logger.info(f"Initializing database with URL: {DATABASE_URL}")
 
-engine = create_engine(
-    DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
+engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
