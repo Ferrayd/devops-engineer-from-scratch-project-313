@@ -20,7 +20,7 @@ services:
     ports:
       - "8080:80"
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/short_links
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/shortener
       PYTHONUNBUFFERED: 1
     depends_on:
       db:
