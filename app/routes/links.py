@@ -3,15 +3,17 @@ import random
 import string
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import (
     create_link,
     delete_link,
     get_all_links,
-    get_link_by_short_code,
+    get_link_by_id,
+    get_link_by_short_name,
     get_session,
+    update_link,
 )
 from app.models import ShortenedLink
 
@@ -22,69 +24,49 @@ router = APIRouter()
 
 
 class CreateLinkRequest(BaseModel):
-    original_url: HttpUrl
+    original_url: str
+    short_name: str | None = None
 
     class Config:
-        json_schema_extra = {"example": {"original_url": "https://www.example.com/very/long/url"}}
+        json_schema_extra = {
+            "example": {
+                "original_url": "https://www.example.com/very/long/url",
+                "short_name": "abc123",
+            }
+        }
+
+
+class UpdateLinkRequest(BaseModel):
+    original_url: str
+    short_name: str
 
 
 class LinkResponse(BaseModel):
     id: int
-    short_code: str
+    short_name: str
     original_url: str
-    short_url: str
     created_at: str
 
     class Config:
         from_attributes = True
 
 
-def generate_short_code(length: int = 6) -> str:
+def generate_short_name(length: int = 6) -> str:
     characters = string.ascii_letters + string.digits
-    short_code = "".join(random.choice(characters) for _ in range(length))
-    logger.debug(f"Generated short code: {short_code}")
-    return short_code
+    short_name = "".join(random.choice(characters) for _ in range(length))
+    logger.debug(f"Generated short_name: {short_name}")
+    return short_name
 
 
-@router.post("/shorten", response_model=LinkResponse, status_code=201)
-async def create_short_link(
-    request: CreateLinkRequest, session: AsyncSession = Depends(get_session)
-):
-    original_url = str(request.original_url)
-    logger.info(f"Creating short link for URL: {original_url}")
-
-    short_code = generate_short_code()
-
-    while await get_link_by_short_code(session, short_code):
-        short_code = generate_short_code()
-        logger.debug("Short code already exists, generating new one")
-
-    try:
-        link = ShortenedLink(short_code=short_code, original_url=original_url)
-        created_link = await create_link(session, link)
-
-        return LinkResponse(
-            id=created_link.id,
-            short_code=created_link.short_code,
-            original_url=created_link.original_url,
-            short_url=f"http://localhost:8080/{created_link.short_code}",
-            created_at=created_link.created_at.isoformat(),
-        )
-    except Exception as e:
-        logger.error(f"Failed to create short link: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to create short link") from e
-
-
-@router.get("/links", response_model=list[LinkResponse])
-async def get_all_links_endpoint(session: AsyncSession = Depends(get_session)):
+@router.get("/links")
+async def get_links(session: AsyncSession = Depends(get_session)):
     try:
         links = await get_all_links(session)
         return [
             LinkResponse(
                 id=link.id,
-                short_code=link.short_code,
+                short_name=link.short_name,
                 original_url=link.original_url,
-                short_url=f"http://localhost:8080/{link.short_code}",
                 created_at=link.created_at.isoformat(),
             )
             for link in links
@@ -94,22 +76,48 @@ async def get_all_links_endpoint(session: AsyncSession = Depends(get_session)):
         raise HTTPException(status_code=500, detail="Failed to fetch links") from e
 
 
-@router.get("/links/{short_code}", response_model=LinkResponse)
-async def get_link_info(short_code: str, session: AsyncSession = Depends(get_session)):
-    logger.info(f"Fetching info for short code: {short_code}")
+@router.post("/links")
+async def create_short_link(
+    request: CreateLinkRequest, session: AsyncSession = Depends(get_session)
+):
+    logger.info(f"Creating short link for URL: {request.original_url}")
+
+    short_name = request.short_name or generate_short_name()
+
+    while await get_link_by_short_name(session, short_name):
+        short_name = generate_short_name()
+        logger.debug("Short name already exists, generating new one")
 
     try:
-        link = await get_link_by_short_code(session, short_code)
+        link = ShortenedLink(short_name=short_name, original_url=request.original_url)
+        created_link = await create_link(session, link)
+
+        return LinkResponse(
+            id=created_link.id,
+            short_name=created_link.short_name,
+            original_url=created_link.original_url,
+            created_at=created_link.created_at.isoformat(),
+        )
+    except Exception as e:
+        logger.error(f"Failed to create short link: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create short link") from e
+
+
+@router.get("/links/{link_id}")
+async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
+    logger.info(f"Fetching link with id: {link_id}")
+
+    try:
+        link = await get_link_by_id(session, link_id)
 
         if not link:
-            logger.warning(f"Short code not found: {short_code}")
-            raise HTTPException(status_code=404, detail="Short link not found")
+            logger.warning(f"Link not found: {link_id}")
+            raise HTTPException(status_code=404, detail="Link not found")
 
         return LinkResponse(
             id=link.id,
-            short_code=link.short_code,
+            short_name=link.short_name,
             original_url=link.original_url,
-            short_url=f"http://localhost:8080/{short_code}",
             created_at=link.created_at.isoformat(),
         )
     except HTTPException:
@@ -119,18 +127,45 @@ async def get_link_info(short_code: str, session: AsyncSession = Depends(get_ses
         raise HTTPException(status_code=500, detail="Failed to fetch link") from e
 
 
-@router.delete("/links/{short_code}", status_code=204)
-async def delete_link_endpoint(short_code: str, session: AsyncSession = Depends(get_session)):
-    logger.info(f"Deleting short link: {short_code}")
+@router.put("/links/{link_id}")
+async def update_link_endpoint(
+    link_id: int, request: UpdateLinkRequest, session: AsyncSession = Depends(get_session)
+):
+    logger.info(f"Updating link {link_id}")
 
     try:
-        link = await get_link_by_short_code(session, short_code)
+        updated = await update_link(session, link_id, request.original_url, request.short_name)
+
+        if not updated:
+            logger.warning(f"Link not found: {link_id}")
+            raise HTTPException(status_code=404, detail="Link not found")
+
+        return LinkResponse(
+            id=updated.id,
+            short_name=updated.short_name,
+            original_url=updated.original_url,
+            created_at=updated.created_at.isoformat(),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update link: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update link") from e
+
+
+@router.delete("/links/{link_id}")
+async def delete_link_endpoint(link_id: int, session: AsyncSession = Depends(get_session)):
+    logger.info(f"Deleting link: {link_id}")
+
+    try:
+        link = await get_link_by_id(session, link_id)
 
         if not link:
-            logger.warning(f"Short code not found: {short_code}")
-            raise HTTPException(status_code=404, detail="Short link not found")
+            logger.warning(f"Link not found: {link_id}")
+            raise HTTPException(status_code=404, detail="Link not found")
 
-        await delete_link(session, link.id)
+        await delete_link(session, link_id)
+        return {"detail": "Link deleted"}
     except HTTPException:
         raise
     except Exception as e:

@@ -74,9 +74,9 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-async def get_link_by_short_code(session: AsyncSession, short_code: str) -> ShortenedLink | None:
-    logger.debug(f"Fetching link with short code: {short_code}")
-    statement = select(ShortenedLink).where(ShortenedLink.short_code.ilike(short_code))
+async def get_link_by_short_name(session: AsyncSession, short_name: str) -> ShortenedLink | None:
+    logger.debug(f"Fetching link with short_name: {short_name}")
+    statement = select(ShortenedLink).where(ShortenedLink.short_name.ilike(short_name))
     result = await session.execute(statement)
     return result.scalar_one_or_none()
 
@@ -112,12 +112,12 @@ async def get_paginated_links(
 
 
 async def create_link(session: AsyncSession, link: ShortenedLink) -> ShortenedLink:
-    logger.info(f"Creating link with short code: {link.short_code}")
+    logger.info(f"Creating link with short_name: {link.short_name}")
     try:
         session.add(link)
         await session.commit()
         await session.refresh(link)
-        logger.info(f"Link created successfully: {link.short_code}")
+        logger.info(f"Link created successfully: {link.short_name}")
         return link
     except Exception as e:
         await session.rollback()
@@ -126,7 +126,7 @@ async def create_link(session: AsyncSession, link: ShortenedLink) -> ShortenedLi
 
 
 async def update_link(
-    session: AsyncSession, link_id: int, original_url: str, short_code: str
+    session: AsyncSession, link_id: int, original_url: str, short_name: str
 ) -> ShortenedLink | None:
     logger.info(f"Updating link {link_id}")
     try:
@@ -136,7 +136,7 @@ async def update_link(
             return None
 
         link.original_url = original_url
-        link.short_code = short_code
+        link.short_name = short_name
         await session.commit()
         await session.refresh(link)
         logger.info(f"Link updated successfully: {link_id}")

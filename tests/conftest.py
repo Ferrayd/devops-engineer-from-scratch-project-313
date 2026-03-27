@@ -11,7 +11,7 @@ from sqlmodel import SQLModel
 from app.config import settings
 from app.database import get_session
 from app.main import app
-from app.models import Link
+from app.models import ShortenedLink
 
 
 project_root = Path(__file__).parent.parent
@@ -68,7 +68,7 @@ async def async_client(async_session):
 @pytest.fixture
 async def sample_links(async_session):
     links = [
-        Link(
+        ShortenedLink(
             original_url=f"https://example.com/url{i}",
             short_name=f"link{i}",
         )
