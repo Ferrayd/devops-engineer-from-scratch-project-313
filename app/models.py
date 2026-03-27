@@ -1,16 +1,16 @@
-from sqlalchemy import Column, DateTime, Integer, String
-from sqlalchemy.sql import func
+from datetime import datetime
+from typing import Optional
 
-from app.database import Base
+from sqlmodel import SQLModel, Field
 
 
-class ShortenedLink(Base):
+class ShortenedLink(SQLModel, table=True):
     __tablename__ = "shortened_links"
-
-    id = Column(Integer, primary_key=True, index=True)
-    short_code = Column(String(10), unique=True, index=True, nullable=False)
-    original_url = Column(String(2048), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    short_code: str = Field(index=True, unique=True, min_length=1, max_length=10)
+    original_url: str = Field(min_length=1, max_length=2048)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
     def __repr__(self):
-        return f"<ShortenedLink(short_code={self.short_code}, original_url={self.original_url})>"
+        return f"<ShortenedLink(id={self.id}, short_code={self.short_code})>"

@@ -1,45 +1,16 @@
-import json
-
-from pydantic import Field
+import os
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    port: int = Field(default=8080, description="Порт сервера")
-    environment: str = Field(default="development", description="Окружение")
-
-    database_url: str = Field(default="sqlite:///./database.db", description="URL подключения к БД")
-
-    short_url_base: str = Field(
-        default="http://localhost:8080/r",
-        description="Базовый URL для коротких ссылок",
+    """Конфигурация приложения"""
+    database_url: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:///./shortener.db"
     )
-
-    cors_origins: list[str] = Field(
-        default=[
-            "http://localhost:5173",
-            "http://localhost:8080",
-        ],
-        description="Допустимые origins для CORS",
-    )
-    cors_credentials: bool = Field(default=True)
-    cors_methods: list[str] = Field(default=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-    cors_headers: list[str] = Field(default=["*"])
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        if isinstance(self.cors_origins, str):
-            try:
-                self.cors_origins = json.loads(self.cors_origins)
-            except json.JSONDecodeError:
-                self.cors_origins = [
-                    "http://localhost:5173",
-                    "http://localhost:8080",
-                ]
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    app_name: str = "URL Shortener"
+    app_version: str = "1.0.0"
+    debug: bool = os.getenv("DEBUG", "False").lower() == "true"
 
 
 settings = Settings()

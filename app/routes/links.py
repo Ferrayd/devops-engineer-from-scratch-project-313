@@ -2,10 +2,18 @@ import logging
 import string
 import random
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, HttpUrl
 
-from app.database import get_db
+from app.database import (
+    get_session,
+    get_link_by_short_code,
+    get_all_links,
+    get_paginated_links,
+    create_link,
+    update_link,
+    delete_link,
+)
 from app.models import ShortenedLink
 
 logger = logging.getLogger(__name__)
@@ -27,6 +35,7 @@ class CreateLinkRequest(BaseModel):
 
 class LinkResponse(BaseModel):
     """Модель ответа со ссылкой"""
+    id: int
     short_code: str
     original_url: str
     short_url: str
@@ -47,55 +56,35 @@ def generate_short_code(length: int = 6) -> str:
 @router.post("/shorten", response_model=LinkResponse, status_code=201)
 async def create_short_link(
     request: CreateLinkRequest,
-    db: Session = Depends(get_db)
+    session: AsyncSession = Depends(get_session)
 ):
     """Создать сокращенную ссылку"""
     original_url = str(request.original_url)
     logger.info(f"Creating short link for URL: {original_url}")
     
-    try:
-        # Проверяем, есть ли уже такая ссылка
-        existing_link = db.query(ShortenedLink).filter(
-            ShortenedLink.original_url == original_url
-        ).first()
-        
-        if existing_link:
-            logger.info(f"Link already exists with short code: {existing_link.short_code}")
-            return LinkResponse(
-                short_code=existing_link.short_code,
-                original_url=existing_link.original_url,
-                short_url=f"http://localhost:8080/{existing_link.short_code}",
-                created_at=existing_link.created_at.isoformat()
-            )
-        
-        # Генерируем короткий код
+    # Генерируем короткий код
+    short_code = generate_short_code()
+    
+    # Проверяем, не занят ли код
+    while await get_link_by_short_code(session, short_code):
         short_code = generate_short_code()
-        
-        # Проверяем, не занят ли код
-        while db.query(ShortenedLink).filter(
-            ShortenedLink.short_code == short_code
-        ).first():
-            short_code = generate_short_code()
-            logger.debug(f"Short code already exists, generating new one")
-        
-        # Создаем запись в БД
-        new_link = ShortenedLink(
+        logger.debug("Short code already exists, generating new one")
+    
+    try:
+        link = ShortenedLink(
             short_code=short_code,
             original_url=original_url
         )
-        db.add(new_link)
-        db.commit()
-        db.refresh(new_link)
-        logger.info(f"Short link created successfully: {short_code}")
+        created_link = await create_link(session, link)
         
         return LinkResponse(
-            short_code=short_code,
-            original_url=original_url,
-            short_url=f"http://localhost:8080/{short_code}",
-            created_at=new_link.created_at.isoformat()
+            id=created_link.id,
+            short_code=created_link.short_code,
+            original_url=created_link.original_url,
+            short_url=f"http://localhost:8080/{created_link.short_code}",
+            created_at=created_link.created_at.isoformat()
         )
     except Exception as e:
-        db.rollback()
         logger.error(f"Failed to create short link: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
@@ -104,14 +93,13 @@ async def create_short_link(
 
 
 @router.get("/links", response_model=list[LinkResponse])
-async def get_all_links(db: Session = Depends(get_db)):
+async def get_all_links_endpoint(session: AsyncSession = Depends(get_session)):
     """Получить все сокращенные ссылки"""
-    logger.info("Fetching all shortened links")
     try:
-        links = db.query(ShortenedLink).all()
-        logger.info(f"Found {len(links)} links")
+        links = await get_all_links(session)
         return [
             LinkResponse(
+                id=link.id,
                 short_code=link.short_code,
                 original_url=link.original_url,
                 short_url=f"http://localhost:8080/{link.short_code}",
@@ -128,14 +116,12 @@ async def get_all_links(db: Session = Depends(get_db)):
 
 
 @router.get("/links/{short_code}", response_model=LinkResponse)
-async def get_link_info(short_code: str, db: Session = Depends(get_db)):
+async def get_link_info(short_code: str, session: AsyncSession = Depends(get_session)):
     """Получить информацию о сокращенной ссылке"""
     logger.info(f"Fetching info for short code: {short_code}")
     
     try:
-        link = db.query(ShortenedLink).filter(
-            ShortenedLink.short_code == short_code
-        ).first()
+        link = await get_link_by_short_code(session, short_code)
         
         if not link:
             logger.warning(f"Short code not found: {short_code}")
@@ -145,6 +131,7 @@ async def get_link_info(short_code: str, db: Session = Depends(get_db)):
             )
         
         return LinkResponse(
+            id=link.id,
             short_code=link.short_code,
             original_url=link.original_url,
             short_url=f"http://localhost:8080/{short_code}",
@@ -161,14 +148,12 @@ async def get_link_info(short_code: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/links/{short_code}", status_code=204)
-async def delete_link(short_code: str, db: Session = Depends(get_db)):
+async def delete_link_endpoint(short_code: str, session: AsyncSession = Depends(get_session)):
     """Удалить сокращенную ссылку"""
     logger.info(f"Deleting short link: {short_code}")
     
     try:
-        link = db.query(ShortenedLink).filter(
-            ShortenedLink.short_code == short_code
-        ).first()
+        link = await get_link_by_short_code(session, short_code)
         
         if not link:
             logger.warning(f"Short code not found: {short_code}")
@@ -177,13 +162,10 @@ async def delete_link(short_code: str, db: Session = Depends(get_db)):
                 detail="Short link not found"
             )
         
-        db.delete(link)
-        db.commit()
-        logger.info(f"Short link deleted successfully: {short_code}")
+        await delete_link(session, link.id)
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         logger.error(f"Failed to delete link: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import health, links
 from app.database import init_db
+from app.config import settings
 
 # Настройка логирования
 logging.basicConfig(
@@ -28,9 +29,9 @@ async def lifespan(app: FastAPI):
 
 # Создание приложения FastAPI
 app = FastAPI(
-    title="URL Shortener",
+    title=settings.app_name,
     description="URL Shortener Service",
-    version="1.0.0",
+    version=settings.app_version,
     lifespan=lifespan
 )
 
@@ -61,19 +62,7 @@ async def root():
     """Корневой эндпоинт приложения"""
     logger.info("Root endpoint called")
     return {
-        "message": "Welcome to URL Shortener",
-        "version": "1.0.0",
+        "message": f"Welcome to {settings.app_name}",
+        "version": settings.app_version,
         "docs": "/docs"
     }
-
-
-if __name__ == "__main__":
-    import uvicorn
-    logger.info("Starting Uvicorn server")
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8080,
-        reload=True,
-        log_level="info"
-    )
