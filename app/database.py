@@ -8,6 +8,7 @@ from sqlmodel import SQLModel, func, select
 from app.config import settings
 from app.models import ShortenedLink
 
+
 logger = logging.getLogger(__name__)
 
 
