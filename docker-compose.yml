@@ -20,7 +20,7 @@ services:
     ports:
       - "8080:80"
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/shortener
+      DATABASE_URL=sqlite:///./shortener.db
       PYTHONUNBUFFERED: 1
     depends_on:
       db:
