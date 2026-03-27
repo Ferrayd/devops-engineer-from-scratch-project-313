@@ -1,4 +1,4 @@
-FROM python:3.14-slim as builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -7,6 +7,7 @@ RUN pip install uv
 COPY requirements.txt .
 
 RUN uv pip install --no-cache-dir -r requirements.txt
+
 
 FROM python:3.14-slim
 
@@ -22,14 +23,12 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY app/ /app/app/
 COPY requirements.txt /app/
-
 COPY nginx.conf /etc/nginx/sites-available/default
-
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-COPY app/static/ /app/static/
+COPY public ./public
 
-RUN mkdir -p /var/log/nginx /var/run/nginx
+RUN mkdir -p /var/log/nginx /var/log/supervisor /var/log/uvicorn /var/run/nginx
 
 EXPOSE 80
 
