@@ -25,7 +25,7 @@ router = APIRouter()
 class CreateLinkRequest(BaseModel):
     """Модель для создания сокращенной ссылки"""
     original_url: str = Field(..., min_length=1)  # Обязательное поле
-    short_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    short_name: str = Field(..., min_length=1, max_length=255)  # Обязательное поле
     
     class Config:
         json_schema_extra = {
@@ -91,13 +91,15 @@ async def create_short_link(
     """Создать сокращенную ссылку"""
     logger.info(f"Creating short link for URL: {request.original_url}")
     
-    # Генерируем короткое имя если не указано
-    short_name = request.short_name or generate_short_name()
+    short_name = request.short_name
     
     # Проверяем, не занято ли имя
-    while await get_link_by_short_name(session, short_name):
-        short_name = generate_short_name()
-        logger.debug("Short name already exists, generating new one")
+    if await get_link_by_short_name(session, short_name):
+        logger.warning(f"Short name already exists: {short_name}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Short name '{short_name}' already exists"
+        )
     
     try:
         link = ShortenedLink(
@@ -112,6 +114,8 @@ async def create_short_link(
             original_url=created_link.original_url,
             short_url=f"/r/{created_link.short_name}"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to create short link: {e}", exc_info=True)
         raise HTTPException(
