@@ -22,7 +22,6 @@ router = APIRouter()
 
 
 class CreateLinkRequest(BaseModel):
-    """Модель для создания сокращенной ссылки"""
     original_url: HttpUrl
     
     class Config:
@@ -34,7 +33,6 @@ class CreateLinkRequest(BaseModel):
 
 
 class LinkResponse(BaseModel):
-    """Модель ответа со ссылкой"""
     id: int
     short_code: str
     original_url: str
@@ -46,7 +44,6 @@ class LinkResponse(BaseModel):
 
 
 def generate_short_code(length: int = 6) -> str:
-    """Генерирует случайный короткий код"""
     characters = string.ascii_letters + string.digits
     short_code = ''.join(random.choice(characters) for _ in range(length))
     logger.debug(f"Generated short code: {short_code}")
@@ -58,14 +55,11 @@ async def create_short_link(
     request: CreateLinkRequest,
     session: AsyncSession = Depends(get_session)
 ):
-    """Создать сокращенную ссылку"""
     original_url = str(request.original_url)
     logger.info(f"Creating short link for URL: {original_url}")
     
-    # Генерируем короткий код
     short_code = generate_short_code()
     
-    # Проверяем, не занят ли код
     while await get_link_by_short_code(session, short_code):
         short_code = generate_short_code()
         logger.debug("Short code already exists, generating new one")
@@ -94,7 +88,6 @@ async def create_short_link(
 
 @router.get("/links", response_model=list[LinkResponse])
 async def get_all_links_endpoint(session: AsyncSession = Depends(get_session)):
-    """Получить все сокращенные ссылки"""
     try:
         links = await get_all_links(session)
         return [
@@ -117,7 +110,6 @@ async def get_all_links_endpoint(session: AsyncSession = Depends(get_session)):
 
 @router.get("/links/{short_code}", response_model=LinkResponse)
 async def get_link_info(short_code: str, session: AsyncSession = Depends(get_session)):
-    """Получить информацию о сокращенной ссылке"""
     logger.info(f"Fetching info for short code: {short_code}")
     
     try:
@@ -149,7 +141,6 @@ async def get_link_info(short_code: str, session: AsyncSession = Depends(get_ses
 
 @router.delete("/links/{short_code}", status_code=204)
 async def delete_link_endpoint(short_code: str, session: AsyncSession = Depends(get_session)):
-    """Удалить сокращенную ссылку"""
     logger.info(f"Deleting short link: {short_code}")
     
     try:

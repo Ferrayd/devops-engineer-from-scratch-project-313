@@ -8,7 +8,6 @@ from app.routes import health, links
 from app.database import init_db
 from app.config import settings
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -18,16 +17,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     logger.info("Starting up application")
     await init_db()
     logger.info("Database initialized")
     yield
-    # Shutdown
     logger.info("Shutting down application")
 
 
-# Создание приложения FastAPI
 app = FastAPI(
     title=settings.app_name,
     description="URL Shortener Service",
@@ -35,7 +31,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Добавление CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,7 +39,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Регистрация роутеров
 app.include_router(
     health.router,
     tags=["health"]
@@ -59,7 +53,6 @@ app.include_router(
 
 @app.get("/", tags=["root"])
 async def root():
-    """Корневой эндпоинт приложения"""
     logger.info("Root endpoint called")
     return {
         "message": f"Welcome to {settings.app_name}",

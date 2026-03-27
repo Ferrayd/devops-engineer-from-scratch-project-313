@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 def get_async_database_url(database_url: str) -> str:
-    """Преобразует URL БД в асинхронный формат"""
     if database_url.startswith("sqlite"):
         return database_url.replace("sqlite:///", "sqlite+aiosqlite:///")
 
@@ -55,7 +54,6 @@ else:
 
 
 async def init_db():
-    """Инициализация базы данных"""
     try:
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
@@ -66,7 +64,6 @@ async def init_db():
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Получить асинхронную сессию БД"""
     async_session_maker = async_sessionmaker(
         engine,
         class_=AsyncSession,
@@ -77,7 +74,6 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_link_by_short_code(session: AsyncSession, short_code: str) -> ShortenedLink | None:
-    """Получить ссылку по короткому коду"""
     logger.debug(f"Fetching link with short code: {short_code}")
     statement = select(ShortenedLink).where(ShortenedLink.short_code.ilike(short_code))
     result = await session.execute(statement)
@@ -85,7 +81,6 @@ async def get_link_by_short_code(session: AsyncSession, short_code: str) -> Shor
 
 
 async def get_link_by_id(session: AsyncSession, link_id: int) -> ShortenedLink | None:
-    """Получить ссылку по ID"""
     logger.debug(f"Fetching link with id: {link_id}")
     statement = select(ShortenedLink).where(ShortenedLink.id == link_id)
     result = await session.execute(statement)
@@ -93,7 +88,6 @@ async def get_link_by_id(session: AsyncSession, link_id: int) -> ShortenedLink |
 
 
 async def get_all_links(session: AsyncSession) -> list[ShortenedLink]:
-    """Получить все ссылки"""
     logger.info("Fetching all links")
     statement = select(ShortenedLink).order_by(ShortenedLink.id)
     result = await session.execute(statement)
@@ -103,7 +97,6 @@ async def get_all_links(session: AsyncSession) -> list[ShortenedLink]:
 async def get_paginated_links(
     session: AsyncSession, start: int = 0, end: int = 10
 ) -> tuple[list[ShortenedLink], int]:
-    """Получить ссылки с пагинацией"""
     logger.info(f"Fetching paginated links: start={start}, end={end}")
     count_statement = select(func.count(ShortenedLink.id))
     count_result = await session.execute(count_statement)
@@ -118,7 +111,6 @@ async def get_paginated_links(
 
 
 async def create_link(session: AsyncSession, link: ShortenedLink) -> ShortenedLink:
-    """Создать новую ссылку"""
     logger.info(f"Creating link with short code: {link.short_code}")
     try:
         session.add(link)
@@ -135,7 +127,6 @@ async def create_link(session: AsyncSession, link: ShortenedLink) -> ShortenedLi
 async def update_link(
     session: AsyncSession, link_id: int, original_url: str, short_code: str
 ) -> ShortenedLink | None:
-    """Обновить ссылку"""
     logger.info(f"Updating link {link_id}")
     try:
         link = await get_link_by_id(session, link_id)
@@ -156,7 +147,6 @@ async def update_link(
 
 
 async def delete_link(session: AsyncSession, link_id: int) -> bool:
-    """Удалить ссылку"""
     logger.info(f"Deleting link: {link_id}")
     try:
         link = await get_link_by_id(session, link_id)
