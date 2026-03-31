@@ -1,7 +1,7 @@
 import logging
 import string
 import random
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
@@ -104,40 +104,68 @@ async def get_links(
 
 @router.post("/links", status_code=201)
 async def create_short_link(
-    request: CreateLinkRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session)
 ):
-    logger.info(f"Creating short link for URL: {request.original_url}")
-    
-    short_name = request.short_name
-    
-    if await get_link_by_short_name(session, short_name):
-        logger.warning(f"Short name already exists: {short_name}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Short name '{short_name}' already exists"
-        )
-    
     try:
+        body = await request.json()
+        logger.info(f"Request body: {body}")
+        
+        original_url = body.get("original_url")
+        short_name = body.get("short_name")
+        
+        if not original_url:
+            raise HTTPException(
+                status_code=422,
+                detail=[{
+                    "loc": ["body", "original_url"],
+                    "msg": "Field required",
+                    "type": "missing"
+                }]
+            )
+        
+        if not short_name:
+            raise HTTPException(
+                status_code=422,
+                detail=[{
+                    "loc": ["body", "short_name"],
+                    "msg": "Field required",
+                    "type": "missing"
+                }]
+            )
+        
+        logger.info(f"Creating short link for URL: {original_url}")
+        
+        if await get_link_by_short_name(session, short_name):
+            logger.warning(f"Short name already exists: {short_name}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Short name '{short_name}' already exists"
+            )
+        
         link = ShortenedLink(
             short_name=short_name,
-            original_url=request.original_url
+            original_url=original_url
         )
         created_link = await create_link(session, link)
         
-        return LinkResponse(
+        response = LinkResponse(
             id=created_link.id,
             short_name=created_link.short_name,
             original_url=created_link.original_url,
             short_url=f"/r/{created_link.short_name}"
         )
+        
+        logger.info(f"Link created successfully: {short_name}")
+        return response
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to create short link: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Failed to create short link"
+            detail=f"Failed to create short link: {str(e)}"
         ) from e
 
 
