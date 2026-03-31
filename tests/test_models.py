@@ -1,9 +1,7 @@
-
 from app.models import ShortenedLink
 
 
 class TestShortenedLinkModel:
-
     def test_create_link(self):
         link = ShortenedLink(short_name="test", original_url="https://example.com")
 

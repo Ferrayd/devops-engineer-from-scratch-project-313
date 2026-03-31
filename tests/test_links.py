@@ -22,7 +22,6 @@ async def client(async_session):
 
 
 class TestCreateLink:
-
     @pytest.mark.asyncio
     async def test_create_link_success(self, client, async_session):
         payload = {"original_url": "https://example.com/article", "short_name": "test123"}
@@ -85,7 +84,6 @@ class TestCreateLink:
 
 
 class TestGetLinks:
-
     @pytest.mark.asyncio
     async def test_get_links_empty(self, client):
         response = await client.get("/api/links")
@@ -124,7 +122,6 @@ class TestGetLinks:
 
 
 class TestGetLink:
-
     @pytest.mark.asyncio
     async def test_get_link_success(self, client, async_session):
         link = ShortenedLink(short_name="test", original_url="https://example.com")
@@ -148,7 +145,6 @@ class TestGetLink:
 
 
 class TestUpdateLink:
-
     @pytest.mark.asyncio
     async def test_update_link_success(self, client, async_session):
         link = ShortenedLink(short_name="old", original_url="https://example.com/old")
@@ -184,7 +180,6 @@ class TestUpdateLink:
 
 
 class TestDeleteLink:
-
     @pytest.mark.asyncio
     async def test_delete_link_success(self, client, async_session):
         link = ShortenedLink(short_name="test", original_url="https://example.com")
@@ -207,7 +202,6 @@ class TestDeleteLink:
 
 
 class TestRedirect:
-
     @pytest.mark.asyncio
     async def test_redirect_success(self, client, async_session):
         link = ShortenedLink(short_name="google", original_url="https://google.com")
@@ -227,7 +221,6 @@ class TestRedirect:
 
 
 class TestHealth:
-
     @pytest.mark.asyncio
     async def test_ping(self, client):
         response = await client.get("/ping")
