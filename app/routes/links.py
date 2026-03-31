@@ -22,6 +22,7 @@ router = APIRouter()
 
 
 class CreateLinkRequest(BaseModel):
+    """Модель для создания сокращенной ссылки"""
     original_url: str = Field(..., min_length=1)
     short_name: str = Field(..., min_length=1, max_length=255)
     
@@ -35,11 +36,13 @@ class CreateLinkRequest(BaseModel):
 
 
 class UpdateLinkRequest(BaseModel):
+    """Модель для обновления ссылки"""
     original_url: str = Field(..., min_length=1)
     short_name: str = Field(..., min_length=1, max_length=255)
 
 
 class LinkResponse(BaseModel):
+    """Модель ответа со ссылкой"""
     id: int
     short_name: str
     original_url: str
@@ -50,6 +53,7 @@ class LinkResponse(BaseModel):
 
 
 def generate_short_name(length: int = 8) -> str:
+    """Генерирует случайное короткое имя"""
     characters = string.ascii_letters + string.digits
     short_name = ''.join(random.choice(characters) for _ in range(length))
     logger.debug(f"Generated short_name: {short_name}")
@@ -59,10 +63,17 @@ def generate_short_name(length: int = 8) -> str:
 @router.get("/links")
 async def get_links(
     session: AsyncSession = Depends(get_session),
-    range: str = Query(None)
+    range: str = Query(None),
+    filter: str = Query(None),
+    sort: str = Query(None)
 ):
+    """Получить все сокращенные ссылки с поддержкой пагинации"""
     try:
+        logger.debug(f"GET /api/links - range: {range}, filter: {filter}, sort: {sort}")
+        
         links = await get_all_links(session)
+        logger.debug(f"Total links fetched: {len(links)}")
+        
         total = len(links)
         
         start = 0
@@ -72,33 +83,42 @@ async def get_links(
             try:
                 range_str = range.strip('[]')
                 start, end = map(int, range_str.split(','))
-            except (ValueError, IndexError):
+                logger.debug(f"Parsed range: start={start}, end={end}")
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse range '{range}': {e}")
                 pass
         
         paginated_links = links[start:end]
+        logger.debug(f"Paginated links count: {len(paginated_links)}")
         
-        response_data = [
-            LinkResponse(
-                id=link.id,
-                short_name=link.short_name,
-                original_url=link.original_url,
-                short_url=f"/r/{link.short_name}"
-            )
-            for link in paginated_links
-        ]
+        response_data = []
+        for link in paginated_links:
+            try:
+                response_data.append(
+                    LinkResponse(
+                        id=link.id,
+                        short_name=link.short_name,
+                        original_url=link.original_url,
+                        short_url=f"/r/{link.short_name}"
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Failed to map link {link.id}: {e}", exc_info=True)
         
-        logger.info(f"Fetching links: total={total}, range=[{start},{end}]")
+        logger.info(f"Returning {len(response_data)} links with range=[{start},{end}], total={total}")
         
         from fastapi.responses import JSONResponse
         return JSONResponse(
-            content=response_data,
+            content=[link.model_dump() for link in response_data],
             headers={"Content-Range": f"items {start}-{end}/{total}"}
         )
     except Exception as e:
         logger.error(f"Failed to fetch links: {e}", exc_info=True)
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
-            detail="Failed to fetch links"
+            detail=f"Failed to fetch links: {str(e)}"
         ) from e
 
 
@@ -107,14 +127,18 @@ async def create_short_link(
     request: Request,
     session: AsyncSession = Depends(get_session)
 ):
+    """Создать сокращенную ссылку"""
     try:
         body = await request.json()
-        logger.info(f"Request body: {body}")
+        logger.info(f"POST /api/links - Request body: {body}")
         
         original_url = body.get("original_url")
         short_name = body.get("short_name")
         
+        logger.debug(f"Parsed: original_url={original_url}, short_name={short_name}")
+        
         if not original_url:
+            logger.warning("original_url is missing")
             raise HTTPException(
                 status_code=422,
                 detail=[{
@@ -125,6 +149,7 @@ async def create_short_link(
             )
         
         if not short_name:
+            logger.warning("short_name is missing")
             raise HTTPException(
                 status_code=422,
                 detail=[{
@@ -134,9 +159,11 @@ async def create_short_link(
                 }]
             )
         
-        logger.info(f"Creating short link for URL: {original_url}")
+        logger.info(f"Creating short link: {short_name} -> {original_url}")
         
-        if await get_link_by_short_name(session, short_name):
+        # Проверяем, не занято ли имя
+        existing = await get_link_by_short_name(session, short_name)
+        if existing:
             logger.warning(f"Short name already exists: {short_name}")
             raise HTTPException(
                 status_code=400,
@@ -156,13 +183,15 @@ async def create_short_link(
             short_url=f"/r/{created_link.short_name}"
         )
         
-        logger.info(f"Link created successfully: {short_name}")
+        logger.info(f"Link created successfully: id={created_link.id}, short_name={short_name}")
         return response
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to create short link: {e}", exc_info=True)
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create short link: {str(e)}"
@@ -171,7 +200,8 @@ async def create_short_link(
 
 @router.get("/links/{link_id}")
 async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
-    logger.info(f"Fetching link with id: {link_id}")
+    """Получить информацию о ссылке по ID"""
+    logger.info(f"GET /api/links/{link_id}")
     
     try:
         link = await get_link_by_id(session, link_id)
@@ -192,7 +222,7 @@ async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to fetch link: {e}", exc_info=True)
+        logger.error(f"Failed to fetch link {link_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Failed to fetch link"
@@ -202,17 +232,30 @@ async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
 @router.put("/links/{link_id}")
 async def update_link_endpoint(
     link_id: int,
-    request: UpdateLinkRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session)
 ):
-    logger.info(f"Updating link {link_id}")
+    """Обновить ссылку"""
+    logger.info(f"PUT /api/links/{link_id}")
     
     try:
+        body = await request.json()
+        logger.debug(f"Request body: {body}")
+        
+        original_url = body.get("original_url")
+        short_name = body.get("short_name")
+        
+        if not original_url or not short_name:
+            raise HTTPException(
+                status_code=422,
+                detail="original_url and short_name are required"
+            )
+        
         updated = await update_link(
             session,
             link_id,
-            request.original_url,
-            request.short_name
+            original_url,
+            short_name
         )
         
         if not updated:
@@ -231,7 +274,7 @@ async def update_link_endpoint(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update link: {e}", exc_info=True)
+        logger.error(f"Failed to update link {link_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Failed to update link"
@@ -240,7 +283,8 @@ async def update_link_endpoint(
 
 @router.delete("/links/{link_id}", status_code=204)
 async def delete_link_endpoint(link_id: int, session: AsyncSession = Depends(get_session)):
-    logger.info(f"Deleting link: {link_id}")
+    """Удалить ссылку"""
+    logger.info(f"DELETE /api/links/{link_id}")
     
     try:
         link = await get_link_by_id(session, link_id)
@@ -253,11 +297,12 @@ async def delete_link_endpoint(link_id: int, session: AsyncSession = Depends(get
             )
         
         await delete_link(session, link_id)
+        logger.info(f"Link deleted: {link_id}")
         return None
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to delete link: {e}", exc_info=True)
+        logger.error(f"Failed to delete link {link_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Failed to delete link"
