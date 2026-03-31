@@ -61,7 +61,7 @@ def generate_short_name(length: int = 8) -> str:
     return short_name
 
 
-# РЕДИРЕКТ - ЭТО ПЕРВЫЙ ENDPOINT!
+# РЕДИРЕКТ - ПЕРВЫЙ ENDPOINT!
 @router.get("/r/{short_name}")
 async def redirect_to_original(short_name: str, session: AsyncSession = Depends(get_session)):
     """Редирект по короткой ссылке на оригинальный URL"""
@@ -96,12 +96,67 @@ async def get_links(
     filter: str = Query(None),
     sort: str = Query(None)
 ):
+    """Получить все сокращенные ссылки с поддержкой пагинации"""
+    try:
+        logger.debug(f"GET /api/links - range: {range}, filter: {filter}, sort: {sort}")
+        
+        links = await get_all_links(session)
+        logger.debug(f"Total links fetched: {len(links)}")
+        
+        total = len(links)
+        
+        start = 0
+        end = total
+        
+        if range:
+            try:
+                range_str = range.strip('[]')
+                start, end = map(int, range_str.split(','))
+                logger.debug(f"Parsed range: start={start}, end={end}")
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse range '{range}': {e}")
+                pass
+        
+        paginated_links = links[start:end]
+        logger.debug(f"Paginated links count: {len(paginated_links)}")
+        
+        response_data = []
+        for link in paginated_links:
+            try:
+                response_data.append(
+                    LinkResponse(
+                        id=link.id,
+                        short_name=link.short_name,
+                        original_url=link.original_url,
+                        short_url=f"/r/{link.short_name}"
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Failed to map link {link.id}: {e}", exc_info=True)
+        
+        logger.info(f"Returning {len(response_data)} links with range=[{start},{end}], total={total}")
+        
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            content=[link.model_dump() for link in response_data],
+            headers={"Content-Range": f"items {start}-{end}/{total}"}
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch links: {e}", exc_info=True)
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch links: {str(e)}"
+        ) from e
+
 
 @router.post("/links", status_code=201)
 async def create_short_link(
     request: CreateLinkRequest,
     session: AsyncSession = Depends(get_session)
 ):
+    """Создать сокращенную ссылку"""
     try:
         logger.info(f"POST /api/links - original_url: {request.original_url}, short_name: {request.short_name}")
         
@@ -110,6 +165,7 @@ async def create_short_link(
         
         logger.info(f"Creating short link: {short_name} -> {original_url}")
         
+        # Проверяем, не занято ли имя
         existing = await get_link_by_short_name(session, short_name)
         if existing:
             logger.warning(f"Short name already exists: {short_name}")
@@ -151,6 +207,7 @@ async def create_short_link(
 
 @router.get("/links/{link_id}")
 async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
+    """Получить информацию о ссылке по ID"""
     logger.info(f"GET /api/links/{link_id}")
     
     try:
@@ -185,6 +242,7 @@ async def update_link_endpoint(
     request: UpdateLinkRequest,
     session: AsyncSession = Depends(get_session)
 ):
+    """Обновить ссылку"""
     logger.info(f"PUT /api/links/{link_id}")
     
     try:
@@ -228,6 +286,7 @@ async def update_link_endpoint(
 
 @router.delete("/links/{link_id}", status_code=204)
 async def delete_link_endpoint(link_id: int, session: AsyncSession = Depends(get_session)):
+    """Удалить ссылку"""
     logger.info(f"DELETE /api/links/{link_id}")
     
     try:
