@@ -2,6 +2,7 @@ import logging
 import string
 import random
 from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field, ValidationError
 
@@ -22,6 +23,7 @@ router = APIRouter()
 
 
 class CreateLinkRequest(BaseModel):
+    """Модель для создания сокращенной ссылки"""
     original_url: str = Field(..., min_length=1)
     short_name: str = Field(..., min_length=1, max_length=255)
     
@@ -35,11 +37,13 @@ class CreateLinkRequest(BaseModel):
 
 
 class UpdateLinkRequest(BaseModel):
+    """Модель для обновления ссылки"""
     original_url: str = Field(..., min_length=1)
     short_name: str = Field(..., min_length=1, max_length=255)
 
 
 class LinkResponse(BaseModel):
+    """Модель ответа со ссылкой"""
     id: int
     short_name: str
     original_url: str
@@ -50,10 +54,39 @@ class LinkResponse(BaseModel):
 
 
 def generate_short_name(length: int = 8) -> str:
+    """Генерирует случайное короткое имя"""
     characters = string.ascii_letters + string.digits
     short_name = ''.join(random.choice(characters) for _ in range(length))
     logger.debug(f"Generated short_name: {short_name}")
     return short_name
+
+
+# РЕДИРЕКТ - ЭТО ПЕРВЫЙ ENDPOINT!
+@router.get("/r/{short_name}")
+async def redirect_to_original(short_name: str, session: AsyncSession = Depends(get_session)):
+    """Редирект по короткой ссылке на оригинальный URL"""
+    logger.info(f"GET /r/{short_name}")
+    
+    try:
+        link = await get_link_by_short_name(session, short_name)
+        
+        if not link:
+            logger.warning(f"Short link not found: {short_name}")
+            raise HTTPException(
+                status_code=404,
+                detail="Short link not found"
+            )
+        
+        logger.info(f"Redirecting {short_name} to {link.original_url}")
+        return RedirectResponse(url=link.original_url, status_code=301)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to redirect {short_name}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to redirect"
+        ) from e
 
 
 @router.get("/links")
@@ -63,59 +96,6 @@ async def get_links(
     filter: str = Query(None),
     sort: str = Query(None)
 ):
-    try:
-        logger.debug(f"GET /api/links - range: {range}, filter: {filter}, sort: {sort}")
-        
-        links = await get_all_links(session)
-        logger.debug(f"Total links fetched: {len(links)}")
-        
-        total = len(links)
-        
-        start = 0
-        end = total
-        
-        if range:
-            try:
-                range_str = range.strip('[]')
-                start, end = map(int, range_str.split(','))
-                logger.debug(f"Parsed range: start={start}, end={end}")
-            except (ValueError, IndexError) as e:
-                logger.warning(f"Failed to parse range '{range}': {e}")
-                pass
-        
-        paginated_links = links[start:end]
-        logger.debug(f"Paginated links count: {len(paginated_links)}")
-        
-        response_data = []
-        for link in paginated_links:
-            try:
-                response_data.append(
-                    LinkResponse(
-                        id=link.id,
-                        short_name=link.short_name,
-                        original_url=link.original_url,
-                        short_url=f"/r/{link.short_name}"
-                    )
-                )
-            except Exception as e:
-                logger.error(f"Failed to map link {link.id}: {e}", exc_info=True)
-        
-        logger.info(f"Returning {len(response_data)} links with range=[{start},{end}], total={total}")
-        
-        from fastapi.responses import JSONResponse
-        return JSONResponse(
-            content=[link.model_dump() for link in response_data],
-            headers={"Content-Range": f"items {start}-{end}/{total}"}
-        )
-    except Exception as e:
-        logger.error(f"Failed to fetch links: {e}", exc_info=True)
-        import traceback
-        logger.error(traceback.format_exc())
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch links: {str(e)}"
-        ) from e
-
 
 @router.post("/links", status_code=201)
 async def create_short_link(
@@ -270,31 +250,4 @@ async def delete_link_endpoint(link_id: int, session: AsyncSession = Depends(get
         raise HTTPException(
             status_code=500,
             detail="Failed to delete link"
-        ) from e
-
-@router.get("/r/{short_name}")
-async def redirect_to_original(short_name: str, session: AsyncSession = Depends(get_session)):
-    logger.info(f"GET /r/{short_name}")
-    
-    try:
-        link = await get_link_by_short_name(session, short_name)
-        
-        if not link:
-            logger.warning(f"Short link not found: {short_name}")
-            raise HTTPException(
-                status_code=404,
-                detail="Short link not found"
-            )
-        
-        logger.info(f"Redirecting {short_name} to {link.original_url}")
-        
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=link.original_url, status_code=301)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to redirect {short_name}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to redirect"
         ) from e

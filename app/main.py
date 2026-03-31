@@ -47,6 +47,11 @@ app.include_router(
 
 app.include_router(
     links.router,
+    tags=["redirect"]
+)
+
+app.include_router(
+    links.router,
     prefix="/api",
     tags=["links"]
 )
