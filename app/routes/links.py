@@ -1,9 +1,9 @@
 import logging
 import string
 import random
-from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from app.database import (
     get_session,
@@ -119,39 +119,14 @@ async def get_links(
 
 @router.post("/links", status_code=201)
 async def create_short_link(
-    request: Request,
+    request: CreateLinkRequest,
     session: AsyncSession = Depends(get_session)
 ):
     try:
-        body = await request.json()
-        logger.info(f"POST /api/links - Request body: {body}")
+        logger.info(f"POST /api/links - original_url: {request.original_url}, short_name: {request.short_name}")
         
-        original_url = body.get("original_url")
-        short_name = body.get("short_name")
-        
-        logger.debug(f"Parsed: original_url={original_url}, short_name={short_name}")
-        
-        if not original_url:
-            logger.warning("original_url is missing")
-            raise HTTPException(
-                status_code=422,
-                detail=[{
-                    "loc": ["body", "original_url"],
-                    "msg": "Field required",
-                    "type": "missing"
-                }]
-            )
-        
-        if not short_name:
-            logger.warning("short_name is missing")
-            raise HTTPException(
-                status_code=422,
-                detail=[{
-                    "loc": ["body", "short_name"],
-                    "msg": "Field required",
-                    "type": "missing"
-                }]
-            )
+        original_url = request.original_url
+        short_name = request.short_name
         
         logger.info(f"Creating short link: {short_name} -> {original_url}")
         
@@ -181,6 +156,9 @@ async def create_short_link(
         
     except HTTPException:
         raise
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=422, detail=e.errors())
     except Exception as e:
         logger.error(f"Failed to create short link: {e}", exc_info=True)
         import traceback
@@ -224,23 +202,16 @@ async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
 @router.put("/links/{link_id}")
 async def update_link_endpoint(
     link_id: int,
-    request: Request,
+    request: UpdateLinkRequest,
     session: AsyncSession = Depends(get_session)
 ):
     logger.info(f"PUT /api/links/{link_id}")
     
     try:
-        body = await request.json()
-        logger.debug(f"Request body: {body}")
+        logger.debug(f"Request: original_url={request.original_url}, short_name={request.short_name}")
         
-        original_url = body.get("original_url")
-        short_name = body.get("short_name")
-        
-        if not original_url or not short_name:
-            raise HTTPException(
-                status_code=422,
-                detail="original_url and short_name are required"
-            )
+        original_url = request.original_url
+        short_name = request.short_name
         
         updated = await update_link(
             session,
@@ -264,6 +235,9 @@ async def update_link_endpoint(
         )
     except HTTPException:
         raise
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=422, detail=e.errors())
     except Exception as e:
         logger.error(f"Failed to update link {link_id}: {e}", exc_info=True)
         raise HTTPException(
