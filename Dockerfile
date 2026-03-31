@@ -21,7 +21,7 @@ FROM python:3.14-slim
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y nginx supervisor && \
+    apt-get install -y nginx supervisor curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -34,9 +34,16 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 COPY public ./public
 
-RUN mkdir -p /var/log/nginx /var/log/supervisor /var/log/uvicorn /var/run/nginx
+RUN mkdir -p /var/log/nginx \
+    /var/log/supervisor \
+    /var/log/uvicorn \
+    /var/run/nginx \
+    /var/run/supervisor
 
 ENV PATH="/app/.venv/bin:$PATH"
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
+    CMD curl -f http://localhost/ping || exit 1
 
 EXPOSE 80
 
