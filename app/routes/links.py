@@ -22,7 +22,6 @@ router = APIRouter()
 
 
 class CreateLinkRequest(BaseModel):
-    """Модель для создания сокращенной ссылки"""
     original_url: str = Field(..., min_length=1)
     short_name: str = Field(..., min_length=1, max_length=255)
     
@@ -36,13 +35,11 @@ class CreateLinkRequest(BaseModel):
 
 
 class UpdateLinkRequest(BaseModel):
-    """Модель для обновления ссылки"""
     original_url: str = Field(..., min_length=1)
     short_name: str = Field(..., min_length=1, max_length=255)
 
 
 class LinkResponse(BaseModel):
-    """Модель ответа со ссылкой"""
     id: int
     short_name: str
     original_url: str
@@ -53,7 +50,6 @@ class LinkResponse(BaseModel):
 
 
 def generate_short_name(length: int = 8) -> str:
-    """Генерирует случайное короткое имя"""
     characters = string.ascii_letters + string.digits
     short_name = ''.join(random.choice(characters) for _ in range(length))
     logger.debug(f"Generated short_name: {short_name}")
@@ -67,7 +63,6 @@ async def get_links(
     filter: str = Query(None),
     sort: str = Query(None)
 ):
-    """Получить все сокращенные ссылки с поддержкой пагинации"""
     try:
         logger.debug(f"GET /api/links - range: {range}, filter: {filter}, sort: {sort}")
         
@@ -127,7 +122,6 @@ async def create_short_link(
     request: Request,
     session: AsyncSession = Depends(get_session)
 ):
-    """Создать сокращенную ссылку"""
     try:
         body = await request.json()
         logger.info(f"POST /api/links - Request body: {body}")
@@ -161,7 +155,6 @@ async def create_short_link(
         
         logger.info(f"Creating short link: {short_name} -> {original_url}")
         
-        # Проверяем, не занято ли имя
         existing = await get_link_by_short_name(session, short_name)
         if existing:
             logger.warning(f"Short name already exists: {short_name}")
@@ -200,7 +193,6 @@ async def create_short_link(
 
 @router.get("/links/{link_id}")
 async def get_link(link_id: int, session: AsyncSession = Depends(get_session)):
-    """Получить информацию о ссылке по ID"""
     logger.info(f"GET /api/links/{link_id}")
     
     try:
@@ -235,7 +227,6 @@ async def update_link_endpoint(
     request: Request,
     session: AsyncSession = Depends(get_session)
 ):
-    """Обновить ссылку"""
     logger.info(f"PUT /api/links/{link_id}")
     
     try:
@@ -283,7 +274,6 @@ async def update_link_endpoint(
 
 @router.delete("/links/{link_id}", status_code=204)
 async def delete_link_endpoint(link_id: int, session: AsyncSession = Depends(get_session)):
-    """Удалить ссылку"""
     logger.info(f"DELETE /api/links/{link_id}")
     
     try:
