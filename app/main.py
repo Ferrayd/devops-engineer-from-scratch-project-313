@@ -4,13 +4,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import health, links
-from app.database import init_db
 from app.config import settings
+from app.database import init_db
+from app.routes import health, links
+
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ app = FastAPI(
     title=settings.app_name,
     description="URL Shortener Service",
     version=settings.app_version,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -40,21 +40,11 @@ app.add_middleware(
     expose_headers=["Content-Range", "X-Total-Count"],
 )
 
-app.include_router(
-    health.router,
-    tags=["health"]
-)
+app.include_router(health.router, tags=["health"])
 
-app.include_router(
-    links.router,
-    tags=["redirect"]
-)
+app.include_router(links.router, tags=["redirect"])
 
-app.include_router(
-    links.router,
-    prefix="/api",
-    tags=["links"]
-)
+app.include_router(links.router, prefix="/api", tags=["links"])
 
 
 @app.get("/", tags=["root"])
@@ -63,17 +53,12 @@ async def root():
     return {
         "message": f"Welcome to {settings.app_name}",
         "version": settings.app_version,
-        "docs": "/docs"
+        "docs": "/docs",
     }
 
 
 if __name__ == "__main__":
     import uvicorn
+
     logger.info("Starting Uvicorn server")
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8080,
-        reload=True,
-        log_level="info"
-    )
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8080, reload=True, log_level="info")
