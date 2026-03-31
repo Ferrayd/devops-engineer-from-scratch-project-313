@@ -2,6 +2,11 @@ FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
+RUN apt-get update && \
+    apt-get install -y build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN pip install uv
 
 COPY requirements.txt .
