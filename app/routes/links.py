@@ -271,3 +271,30 @@ async def delete_link_endpoint(link_id: int, session: AsyncSession = Depends(get
             status_code=500,
             detail="Failed to delete link"
         ) from e
+
+@router.get("/r/{short_name}")
+async def redirect_to_original(short_name: str, session: AsyncSession = Depends(get_session)):
+    logger.info(f"GET /r/{short_name}")
+    
+    try:
+        link = await get_link_by_short_name(session, short_name)
+        
+        if not link:
+            logger.warning(f"Short link not found: {short_name}")
+            raise HTTPException(
+                status_code=404,
+                detail="Short link not found"
+            )
+        
+        logger.info(f"Redirecting {short_name} to {link.original_url}")
+        
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=link.original_url, status_code=301)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to redirect {short_name}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to redirect"
+        ) from e
