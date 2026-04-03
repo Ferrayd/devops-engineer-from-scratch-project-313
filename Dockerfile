@@ -1,8 +1,13 @@
-FROM ghcr.io/astral-sh/uv:latest
+FROM python:3.14-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache nginx
+RUN apk add --no-cache \
+    curl \
+    nginx && \
+    curl -sSL https://astral.sh/uv/install.sh | sh
+
+ENV PATH="/root/.local/bin:$PATH"
 
 COPY requirements.txt .
 
