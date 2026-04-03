@@ -1,50 +1,25 @@
-FROM python:3.14-slim AS builder
+FROM ghcr.io/astral-sh/uv:latest
 
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y build-essential && \
+    apt-get install -y nginx && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-RUN pip install uv
 
 COPY requirements.txt .
 
-RUN uv venv
-
-RUN . .venv/bin/activate && uv pip install --no-cache-dir -r requirements.txt
-
-
-FROM python:3.14-slim
-
-WORKDIR /app
-
-RUN apt-get update && \
-    apt-get install -y nginx supervisor curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /app/.venv /app/.venv
+RUN uv pip install --no-cache-dir -r requirements.txt
 
 COPY app/ /app/app/
-COPY requirements.txt /app/
 COPY nginx.conf /etc/nginx/sites-available/default
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY start.sh /app/start.sh
 
 COPY public ./public
 
-RUN mkdir -p /var/log/nginx \
-    /var/log/supervisor \
-    /var/log/uvicorn \
-    /var/run/nginx \
-    /var/run/supervisor
-
-ENV PATH="/app/.venv/bin:$PATH"
-
-HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-    CMD curl -f http://localhost/ping || exit 1
+RUN mkdir -p /var/log/nginx /var/run/nginx && \
+    chmod +x /app/start.sh
 
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/app/start.sh"]

@@ -66,7 +66,6 @@ def generate_short_name(length: int = 8) -> str:
     return short_name
 
 
-# РЕДИРЕКТ - ПЕРВЫЙ ENDPOINT!
 @router.get("/r/{short_name}")
 async def redirect_to_original(short_name: str, session: AsyncSession = Depends(get_session)):
     """Редирект по короткой ссылке на оригинальный URL"""
