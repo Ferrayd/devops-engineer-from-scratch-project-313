@@ -2,10 +2,7 @@ FROM ghcr.io/astral-sh/uv:latest
 
 WORKDIR /app
 
-RUN apt-get update && \
-    apt-get install -y nginx && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache nginx
 
 COPY requirements.txt .
 
