@@ -2,16 +2,14 @@ FROM python:3.14-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache \
-    curl \
-    nginx && \
-    curl -sSL https://astral.sh/uv/install.sh | sh
+RUN apk add --no-cache nginx curl
 
+RUN curl -sSL https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 COPY requirements.txt .
 
-RUN uv pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache-dir -r requirements.txt
 
 COPY app/ /app/app/
 COPY nginx.conf /etc/nginx/sites-available/default
