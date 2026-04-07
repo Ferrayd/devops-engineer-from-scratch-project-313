@@ -17,6 +17,7 @@ trap cleanup SIGTERM SIGINT
 log "Starting Nginx..."
 nginx -g "daemon off;" &
 NGINX_PID=$!
+sleep 1
 
 log "Starting Uvicorn..."
 uvicorn app.main:app --host 127.0.0.1 --port 8000 &

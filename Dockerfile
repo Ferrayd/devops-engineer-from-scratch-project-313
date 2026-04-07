@@ -1,25 +1,21 @@
-FROM python:3.14-alpine
+FROM python:3.14-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nginx curl && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN apk add --no-cache nginx curl
-
-RUN curl -sSL https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
-
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN uv pip install --system --no-cache-dir -r requirements.txt
+COPY . .
 
-COPY app/ /app/app/
-COPY nginx.conf /etc/nginx/sites-available/default
-COPY start.sh /app/start.sh
+COPY nginx.conf /etc/nginx/nginx.conf
 
-COPY public ./public
-
-RUN mkdir -p /var/log/nginx /var/run/nginx && \
-    chmod +x /app/start.sh
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
 EXPOSE 80
 
-CMD ["/app/start.sh"]
+CMD ["/start.sh"]
